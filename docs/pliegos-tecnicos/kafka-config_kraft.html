@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>kafka-config_kraft</title>
+    <style>
+        body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px;}
+        pre{background:#f5f5f5;padding:1em;overflow-x:auto;}
+        code{font-family:Consolas,monospace;}
+        h1,h2,h3{color:#2c3e50;}
+        table{border-collapse:collapse;width:100%;margin:1em 0;}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+        th{background-color:#f2f2f2;}
+        tr:nth-child(even){background-color:#f9f9f9;}
+        a{color:#3498db;text-decoration:none;}
+        a:hover{text-decoration:underline;}
+        .breadcrumb{background:#f8f9fa;padding:8px 15px;border-radius:4px;margin-bottom:20px;}
+        .breadcrumb a{color:#6c757d;}
+        .breadcrumb a:hover{color:#0056b3;}
+    </style>
+</head>
+<body><div class="breadcrumb"><a href="../index.html">Inicio</a> / <span>pliegos-tecnicos</span></div><h1>Configuración de Apache Kafka en Contenedores</h1>
+<p><img alt="raw" src="../../images/kafka/kafka.png" /></p>
+<p>Esta guía proporciona instrucciones detalladas para instalar y desplegar Apache Kafka en un contenedor Docker, asegurando compatibilidad en todas las plataformas (Linux, macOS, Windows, incluyendo WSL).</p>
+<h2>Tabla de Contenidos</h2>
+<ul>
+<li><a href="#configuración-de-apache-kafka-en-contenedores">Configuración de Apache Kafka en Contenedores</a></li>
+<li><a href="#tabla-de-contenidos">Tabla de Contenidos</a></li>
+<li><a href="#prerrequisitos">Prerrequisitos</a></li>
+<li><a href="#despliegue-de-kafka-modo-kraft">Despliegue de Kafka (modo KRaft)</a><ul>
+<li><a href="#1-clona-el-repositorio-y-usa-el-compose-community">1. Clona el repositorio y usa el compose community</a></li>
+<li><a href="#2-levanta-los-servicios">2. Levanta los servicios</a></li>
+</ul>
+</li>
+<li><a href="#verificar-el-despliegue">Verificar el Despliegue</a></li>
+<li><a href="#consejos-y-recomendaciones">Consejos y recomendaciones</a></li>
+<li><a href="#recursos-adicionales">Recursos Adicionales</a></li>
+<li><a href="#componentes-del-docker-compose-de-confluent-community">Componentes del Docker Compose de Confluent Community</a><ul>
+<li><a href="#para-qué-sirve-cada-uno-y-cómo-usarlos">¿Para qué sirve cada uno y cómo usarlos?</a></li>
+<li><a href="#1-broker">1. <strong>broker</strong></a></li>
+<li><a href="#2-schema-registry">2. <strong>schema-registry</strong></a></li>
+<li><a href="#3-connect-kafka-connect--datagen">3. <strong>connect</strong> (Kafka Connect + Datagen)</a></li>
+<li><a href="#4-rest-proxy">4. <strong>rest-proxy</strong></a></li>
+<li><a href="#5-ksqldb-server-y-ksqldb-cli">5. <strong>ksqldb-server</strong> y <strong>ksqldb-cli</strong></a></li>
+<li><a href="#6-ksql-datagen">6. <strong>ksql-datagen</strong></a></li>
+<li><a href="#7-flink-jobmanager-flink-taskmanager-flink-sql-client">7. <strong>flink-jobmanager</strong>, <strong>flink-taskmanager</strong>, <strong>flink-sql-client</strong></a></li>
+</ul>
+</li>
+<li><a href="#ejemplo-de-flujo-de-trabajo-usando-varios-servicios">Ejemplo de flujo de trabajo usando varios servicios</a></li>
+<li><a href="#recursos-útiles">Recursos útiles</a></li>
+<li><a href="#volver-a-su-ficha">Volver a su ficha</a></li>
+</ul>
+<h2>Prerrequisitos</h2>
+<p>Antes de comenzar, asegúrate de lo siguiente:</p>
+<ul>
+<li><strong>Docker</strong> está instalado y en ejecución.</li>
+<li><strong>Docker Compose</strong> está instalado (se recomienda la versión 2.29.x o superior). Verifica con:</li>
+</ul>
+<blockquote>
+<p>Puedes utilizar el script de <code>docker_install.sh</code> de la carpeta <code>/resources</code> para instalar ambas cosas en WSL/Ubuntu.</p>
+</blockquote>
+<ul>
+<li>Tienes suficiente espacio en disco para los logs de Kafka (al menos 1GB para pruebas).</li>
+<li>Los puertos principales (ver tabla más abajo) están disponibles en tu máquina.</li>
+</ul>
+<h2>Despliegue de Kafka (modo KRaft)</h2>
+<p>Desde 2023, Kafka soporta el modo KRaft (Kafka Raft Metadata mode). El método recomendado es usar el repositorio oficial de Confluent:</p>
+<p><a href="https://github.com/confluentinc/cp-all-in-one">https://github.com/confluentinc/cp-all-in-one</a></p>
+<h3>1. Clona el repositorio y usa el compose community</h3>
+<pre><code class="language-bash">git clone https://github.com/confluentinc/cp-all-in-one.git
+cd cp-all-in-one/cp-all-in-one-community
+</code></pre>
+<h3>2. Levanta los servicios</h3>
+<pre><code class="language-bash">docker compose up -d
+</code></pre>
+<p>Esto desplegará:</p>
+<ul>
+<li><strong>Kafka Broker</strong></li>
+<li><strong>Schema Registry</strong></li>
+<li><strong>Kafka Connect</strong></li>
+<li><strong>ksqlDB</strong></li>
+<li><strong>Control Center</strong></li>
+<li><strong>REST Proxy</strong></li>
+<li><strong>Flink Job Manager</strong></li>
+</ul>
+<p>Puedes editar el <code>docker-compose.yml</code> para quitar servicios que no necesites.</p>
+<hr />
+<h2>Verificar el Despliegue</h2>
+<ul>
+<li>Revisa los logs de los contenedores:</li>
+</ul>
+<p><code>bash
+  docker compose logs kafka
+  docker compose logs schema-registry</code></p>
+<hr />
+<h2>Consejos y recomendaciones</h2>
+<ul>
+<li>Puedes eliminar servicios del <code>docker-compose.yml</code> si solo necesitas Kafka puro.</li>
+<li>Para producción, revisa la persistencia de volúmenes y la configuración de redes.</li>
+<li>Consulta la <a href="https://kafka.apache.org/documentation/#kraft">guía oficial de KRaft</a> para detalles avanzados.</li>
+<li>Para desarrollo, puedes usar los servicios auxiliares (Schema Registry, Connect, etc.) según tus necesidades.</li>
+</ul>
+<h2>Recursos Adicionales</h2>
+<ul>
+<li><a href="https://github.com/confluentinc/cp-all-in-one">Repositorio cp-all-in-one (Confluent)</a></li>
+<li><a href="https://kafka.apache.org/documentation/">Documentación oficial de Kafka</a></li>
+</ul>
+<hr />
+<h2>Componentes del Docker Compose de Confluent Community</h2>
+<table>
+<thead>
+<tr>
+<th>Servicio</th>
+<th>Imagen Docker</th>
+<th>Propósito principal</th>
+<th>Puerto(s) principales</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>broker</td>
+<td>confluentinc/cp-kafka</td>
+<td>Broker de Kafka: gestiona topics, mensajes, particiones, etc.</td>
+<td>9092, 9101</td>
+</tr>
+<tr>
+<td>schema-registry</td>
+<td>confluentinc/cp-schema-registry</td>
+<td>Gestión de esquemas Avro/JSON/Protobuf para los mensajes de Kafka.</td>
+<td>8081</td>
+</tr>
+<tr>
+<td>connect</td>
+<td>cnfldemos/kafka-connect-datagen</td>
+<td>Integración de Kafka con sistemas externos (bases de datos, ficheros, etc.) y generación de datos demo.</td>
+<td>8083</td>
+</tr>
+<tr>
+<td>rest-proxy</td>
+<td>confluentinc/cp-kafka-rest</td>
+<td>API REST para interactuar con Kafka sin necesidad de librerías Java.</td>
+<td>8082</td>
+</tr>
+<tr>
+<td>ksqldb-server</td>
+<td>confluentinc/cp-ksqldb-server</td>
+<td>Motor de SQL streaming sobre Kafka (KSQL).</td>
+<td>8088</td>
+</tr>
+<tr>
+<td>ksqldb-cli</td>
+<td>confluentinc/cp-ksqldb-cli</td>
+<td>CLI para interactuar con ksqlDB Server.</td>
+<td>-</td>
+</tr>
+<tr>
+<td>ksql-datagen</td>
+<td>confluentinc/ksqldb-examples</td>
+<td>Generador de datos de ejemplo para pruebas en ksqlDB.</td>
+<td>-</td>
+</tr>
+<tr>
+<td>flink-jobmanager</td>
+<td>cnfldemos/flink-kafka</td>
+<td>Apache Flink: procesamiento de streams y batch en tiempo real.</td>
+<td>8081, 9081, 6123</td>
+</tr>
+<tr>
+<td>flink-taskmanager</td>
+<td>cnfldemos/flink-kafka</td>
+<td>Ejecuta tareas de Flink (workers).</td>
+<td>8081, 6123</td>
+</tr>
+<tr>
+<td>flink-sql-client</td>
+<td>cnfldemos/flink-sql-client-kafka</td>
+<td>CLI para ejecutar consultas SQL sobre Flink.</td>
+<td>8081, 6123</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3>¿Para qué sirve cada uno y cómo usarlos?</h3>
+<h4>1. <strong>broker</strong></h4>
+<ul>
+<li><strong>Propósito</strong>: Servidor de Kafka que maneja el almacenamiento y la transmisión de mensajes.</li>
+<li><strong>Imagen</strong>: <code>confluentinc/cp-kafka</code></li>
+<li><strong>Puerto</strong>: 9092</li>
+<li><strong>Uso</strong>:</li>
+<li>
+<p><strong>Crear un topic</strong>:</p>
+<p><code>bash
+sudo docker compose exec broker kafka-topics --create \
+  --bootstrap-server localhost:9092 \
+  --topic test-topic \
+  --partitions 1 \
+  --replication-factor 1</code></p>
+<ul>
+<li><strong>Salida</strong>:</li>
+</ul>
+<p><code>bash
+  Created topic test-topic.</code></p>
+</li>
+<li>
+<p><strong>Listar topics</strong>:</p>
+<p><code>bash
+sudo docker compose exec broker kafka-topics --list --bootstrap-server localhost:9092</code></p>
+<ul>
+<li><strong>Salida</strong>:</li>
+</ul>
+<p><code>bash
+  test-topic</code></p>
+</li>
+<li>
+<p><strong>Producir mensajes</strong> (CLI):</p>
+<p><code>bash
+sudo docker compose exec -it broker kafka-console-producer \
+  --bootstrap-server localhost:9092 \
+  --topic test-topic</code></p>
+<ul>
+<li>Escribe mensajes y pulsa Enter para enviarlos. Usa Ctrl+C para salir.</li>
+</ul>
+</li>
+<li>
+<p><strong>Consumir mensajes</strong> (CLI):</p>
+<p><code>bash
+sudo docker compose exec -it broker kafka-console-consumer \
+  --bootstrap-server localhost:9092 \
+  --topic test-topic \
+  --from-beginning</code></p>
+</li>
+<li>
+<p><strong>Ver detalles de un topic</strong>:</p>
+<p><code>bash
+sudo docker compose exec broker kafka-topics --describe \
+  --bootstrap-server localhost:9092 \
+  --topic test-topic</code></p>
+</li>
+<li>
+<p><strong>Eliminar un topic</strong>:</p>
+<p><code>bash
+sudo docker compose exec broker kafka-topics --delete \
+  --bootstrap-server localhost:9092 \
+  --topic test-topic</code></p>
+<ul>
+<li><strong>Nota</strong>: La eliminación de topics debe estar habilitada en la configuración del broker.</li>
+</ul>
+</li>
+<li>
+<p><strong>Ver mensajes en un topic</strong> (sin consumirlos):</p>
+<p><code>bash
+sudo docker compose exec -T broker kafka-console-consumer \
+  --bootstrap-server localhost:9092 \
+  --topic test-topic \
+  --from-beginning</code></p>
+</li>
+</ul>
+<h4>2. <strong>schema-registry</strong></h4>
+<ul>
+<li><strong>Propósito</strong>: Permite registrar y validar esquemas de los mensajes (Avro, JSON Schema, Protobuf).</li>
+<li><strong>Imagen</strong>: <code>confluentinc/cp-schema-registry</code></li>
+<li><strong>Puerto</strong>: 8081</li>
+<li><strong>Uso</strong>:  </li>
+<li>Registrar y consultar esquemas vía API REST.</li>
+<li>
+<p>Ejemplo: Registrar un esquema Avro (usando curl):</p>
+<p><code>bash
+curl -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+  --data '{"schema": "{\"type\":\"string\"}"}' \
+  http://localhost:8081/subjects/test-topic-value/versions</code></p>
+</li>
+<li>
+<p>Consultar esquemas:</p>
+<p><code>bash
+curl http://localhost:8081/subjects</code></p>
+<ul>
+<li><strong>Salida</strong> (después de registrar el esquema):</li>
+</ul>
+<p><code>json
+  {
+    "id": 1
+  }</code></p>
+<p>Esto devuelve el ID del esquema recién creado.</p>
+</li>
+<li>
+<p>Consultar versiones de un esquema (después de varios registros):</p>
+<p><code>bash
+curl http://localhost:8081/subjects/test-topic-value/versions</code></p>
+<ul>
+<li><strong>Salida</strong>:</li>
+</ul>
+<p><code>json
+  [1, 2, 3]</code></p>
+<blockquote>
+<p>Muestra un array con los números de versión del esquema para el subject especificado. Cada número corresponde a una versión distinta del esquema.</p>
+</blockquote>
+</li>
+<li>
+<p>Obtener un esquema específico:</p>
+<p><code>bash
+curl http://localhost:8081/subjects/test-topic-value/versions/1</code></p>
+<ul>
+<li><strong>Salida</strong>:</li>
+</ul>
+<p><code>json
+  {
+    "subject": "test-topic-value",
+    "version": 1,
+    "id": 1,
+    "schema": "{\"type\":\"string\"}"
+  }</code></p>
+</li>
+</ul>
+<h4>3. <strong>connect</strong> (Kafka Connect + Datagen)</h4>
+<ul>
+<li><strong>Propósito</strong>: Integrar Kafka con otros sistemas (bases de datos, ficheros, etc.) y generar datos de prueba.</li>
+<li><strong>Imagen</strong>: <code>cnfldemos/kafka-connect-datagen</code></li>
+<li><strong>Puerto</strong>: 8083</li>
+<li><strong>Uso</strong>:  </li>
+<li>
+<p>Listar conectores activos:</p>
+<p><code>bash
+curl -s http://localhost:8083/connectors | jq</code></p>
+<blockquote>
+<p>Nota: Necesitas tener instalado <code>jq</code> para formatear la salida JSON. Si no lo tienes, usa solo <code>curl http://localhost:8083/connectors</code></p>
+</blockquote>
+<p><code>bash
+sudo apt install jq</code></p>
+</li>
+<li>
+<p>Crear un conector Datagen para generar datos de ejemplo:</p>
+<p><code>bash
+curl -X POST -H "Content-Type: application/json" \
+  --data '{
+    "name": "datagen-users",
+    "config": {
+      "connector.class": "io.confluent.kafka.connect.datagen.DatagenConnector",
+      "kafka.topic": "users",
+      "quickstart": "users",
+      "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+      "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "value.converter.schemas.enable": "false",
+      "max.interval": "1000",
+      "iterations": "1000",
+      "tasks.max": "1"
+    }
+  }' http://localhost:8083/connectors</code></p>
+</li>
+<li>
+<p>Verificar el estado del conector:</p>
+<p><code>bash
+curl -s http://localhost:8083/connectors/datagen-users/status | jq</code></p>
+<ul>
+<li><strong>Salida de ejemplo</strong>:</li>
+</ul>
+<p><code>bash
+  {
+  "name": "datagen-users",
+  "connector": {
+    "state": "RUNNING",
+    "worker_id": "connect:8083"
+  },
+  "tasks": [
+    {
+      "id": 0,
+      "state": "RUNNING",
+      "worker_id": "connect:8083"
+    }
+  ],
+  "type": "source"
+  }</code></p>
+</li>
+<li>
+<p>Eliminar un conector:</p>
+<p><code>bash
+curl -X DELETE http://localhost:8083/connectors/datagen-users</code></p>
+</li>
+</ul>
+<h4>4. <strong>rest-proxy</strong></h4>
+<ul>
+<li><strong>Propósito</strong>: Proporciona una API REST para interactuar con Kafka sin necesidad de usar las librerías de cliente de Java.</li>
+<li><strong>Imagen</strong>: <code>confluentinc/cp-kafka-rest</code></li>
+<li><strong>Puerto</strong>: 8082</li>
+<li>
+<p><strong>Uso</strong>:</p>
+</li>
+<li>
+<p><strong>Producir mensajes</strong> (formato JSON):</p>
+<p>```bash</p>
+<h1>Producir un mensaje simple</h1>
+<p>curl -X POST -H "Content-Type: application/vnd.kafka.json.v2+json" \
+  -H "Accept: application/vnd.kafka.v2+json" \
+  --data '{"records":[{"value":{"message":"Hola Kafka desde REST Proxy"}}]}' \
+  "http://localhost:8082/topics/test-topic"
+```</p>
+</li>
+<li>
+<p><strong>Crear un consumidor</strong> (solo necesita hacerse una vez):</p>
+<p>```bash</p>
+<h1>Crear un consumidor con formato binario (maneja cualquier tipo de mensaje)</h1>
+<p>curl -X POST -H "Content-Type: application/vnd.kafka.v2+json" \
+  --data '{
+    "name": "mi-consumer-1",
+    "format": "binary",
+    "auto.offset.reset": "earliest"
+  }' \
+  http://localhost:8082/consumers/mi-grupo
+```</p>
+<blockquote>
+<p><strong>Nota sobre formatos</strong>:
+- Usa <code>"format": "binary"</code> para consumir cualquier tipo de mensaje (incluyendo texto plano)
+- Usa <code>"format": "json"</code> solo si todos los mensajes son JSON válidos
+- El error <code>JsonParseException</code> indica que hay mensajes que no son JSON en el topic</p>
+</blockquote>
+<ul>
+<li><strong>Respuesta exitosa</strong>:</li>
+</ul>
+<p><code>json
+  {
+    "instance_id": "mi-consumer-1",
+    "base_uri": "http://localhost:8082/consumers/mi-grupo/instances/mi-consumer-1"
+  }</code></p>
+</li>
+<li>
+<p><strong>Verificar consumidores existentes</strong>:</p>
+<p>```bash</p>
+<h1>Listar todos los consumidores en el grupo</h1>
+<p>curl -X GET http://localhost:8082/consumers/mi-grupo/instances
+```</p>
+</li>
+<li>
+<p><strong>Suscribir el consumidor a un topic</strong>:</p>
+<p>```bash</p>
+<h1>Suscribir a un topic específico</h1>
+<p>curl -X POST -H "Content-Type: application/vnd.kafka.v2+json" \
+  --data '{"topics":["test-topic"]}' \
+  http://localhost:8082/consumers/mi-grupo/instances/mi-consumer-1/subscription
+```</p>
+<ul>
+<li><strong>Respuesta exitosa</strong>: <code>204 No Content</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Consumir mensajes</strong>:</p>
+<p>```bash</p>
+<h1>Para consumir mensajes binarios (cualquier formato):</h1>
+<p>curl -X GET -H "Accept: application/vnd.kafka.binary.v2+json" \
+  http://localhost:8082/consumers/mi-grupo/instances/mi-consumer-1/records
+```</p>
+<ul>
+<li><strong>Ejemplo de respuesta con mensajes en base64</strong>:</li>
+</ul>
+<p><code>json
+  [
+    {"topic":"test-topic","key":null,"value":"aG9sYQ==","partition":0,"offset":0},
+    {"topic":"test-topic","key":null,"value":"eyJtc2ciOiJlamVtcGxvIn0=","partition":0,"offset":1}
+  ]</code></p>
+</li>
+<li>
+<p><strong>Para decodificar los mensajes base64</strong>:</p>
+<p>```bash</p>
+<h1>Decodificar un mensaje específico</h1>
+<p>echo "aG9sYQ==" | base64 -d  # Salida: hola</p>
+<h1>Decodificar todos los mensajes de la respuesta</h1>
+<p>curl -s -X GET -H "Accept: application/vnd.kafka.binary.v2+json" \
+  http://localhost:8082/consumers/mi-grupo/instances/mi-consumer-1/records | \
+  grep -o '"value":"[^"]*' | cut -d'"' -f4 | while read -r line; do
+    echo "Mensaje: $(echo $line | base64 -d)"
+  done
+```</p>
+<blockquote>
+<p><strong>Notas</strong>:
+- Usa <code>application/vnd.kafka.binary.v2+json</code> para consumir cualquier tipo de mensaje
+- Los mensajes se devuelven en base64 en el campo <code>value</code>
+- Para reiniciar el offset y leer desde el principio, crea un nuevo consumidor</p>
+</blockquote>
+<ul>
+<li><strong>Salida de ejemplo cuando hay mensajes</strong>:</li>
+</ul>
+<p><code>json
+  [
+    {
+      "topic": "test-topic",
+      "key": null,
+      "value": {"message": "Hola Kafka desde REST Proxy"},
+      "partition": 0,
+      "offset": 0
+    }
+  ]</code></p>
+<blockquote>
+<p><strong>Solución de problemas</strong>:
+- <code>404 Not Found</code>: El consumidor no existe o fue eliminado
+- <code>409 Conflict</code>: El nombre del consumidor ya está en uso
+- <code>422 Unprocessable Entity</code>: Formato de petición inválido
+- <code>40801</code> o <code>JsonParseException</code>: Usa formato <code>binary</code> en lugar de <code>json</code></p>
+</blockquote>
+</li>
+<li>
+<p><strong>Eliminar el consumidor</strong> cuando ya no sea necesario:</p>
+<p>```bash</p>
+<h1>Eliminar el consumidor</h1>
+<p>curl -X DELETE -H "Content-Type: application/vnd.kafka.v2+json" \
+  http://localhost:8082/consumers/mi-grupo/instances/mi-consumer-1
+```</p>
+<ul>
+<li><strong>Respuesta exitosa</strong>: <code>204 No Content</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Verificar si el consumidor fue eliminado</strong>:</p>
+<p>```bash</p>
+<h1>Debería devolver 404 si el consumidor ya no existe</h1>
+<p>curl -v http://localhost:8082/consumers/mi-grupo/instances/mi-consumer-1
+```</p>
+</li>
+</ul>
+<h4>5. <strong>ksqldb-server</strong> y <strong>ksqldb-cli</strong></h4>
+<ul>
+<li><strong>Propósito</strong>: Procesamiento de streams con SQL en tiempo real.</li>
+<li><strong>Imagen servidor</strong>: <code>confluentinc/cp-ksqldb-server</code></li>
+<li><strong>Imagen CLI</strong>: <code>confluentinc/cp-ksqldb-cli</code></li>
+<li><strong>Puerto servidor</strong>: 8088</li>
+<li><strong>Uso</strong>:  Permite crear streams, tablas y consultas SQL en tiempo real.</li>
+<li><strong>Uso:</strong>  </li>
+<li>
+<p>Acceder al CLI:</p>
+<p><code>bash
+sudo docker compose exec ksqldb-cli ksql http://ksqldb-server:8088</code></p>
+<p><img alt="ksqldb" src="../../images/kafka/kafka_ksqldb.png" /></p>
+</li>
+<li>
+<p>Consultar streams:</p>
+<p><code>sql
+SHOW STREAMS;</code></p>
+<p><img alt="ksqldb" src="../../images/kafka/kafka_ksqldb_show.png" /></p>
+</li>
+<li>
+<p>Creación de stream:</p>
+<p><code>sql
+CREATE STREAM test_stream (field VARCHAR) WITH (KAFKA_TOPIC='test-topic', VALUE_FORMAT='JSON');</code></p>
+<p><img alt="ksqldb" src="../../images/kafka/kafka_ksqldb_create.png" /></p>
+</li>
+<li>
+<p>Consultar stream en directo:</p>
+<p><code>sql
+SELECT * FROM test_stream EMIT CHANGES;</code></p>
+<p><img alt="ksqldb" src="../../images/kafka/kafka_ksqldb_select.png" /></p>
+</li>
+</ul>
+<h4>6. <strong>ksql-datagen</strong></h4>
+<ul>
+<li><strong>Propósito</strong>: Generador de datos de ejemplo para pruebas en ksqlDB.</li>
+<li><strong>Imagen</strong>: <code>confluentinc/ksqldb-examples</code></li>
+<li><strong>Uso</strong>:  </li>
+<li>
+<p>Ejecutar un generador de datos para un topic específico:</p>
+<p><code>bash
+sudo docker run --network=host --rm confluentinc/ksqldb-examples:7.5.0 \
+  ksql-datagen \
+  bootstrap-server=localhost:9092 \
+  quickstart=users \
+  topic=users \
+  format=json \
+  key=userid \
+  msgRate=1 
+  iterations=10</code></p>
+<p>Salida:</p>
+<p><code>bash
+['User_4'] --&gt; ([ 1491695010019L | 'User_4' | 'Region_1' | 'FEMALE' ]) ts:1752129794127
+['User_3'] --&gt; ([ 1517479500291L | 'User_3' | 'Region_8' | 'OTHER' ]) ts:1752129794609
+['User_1'] --&gt; ([ 1514886328356L | 'User_1' | 'Region_7' | 'OTHER' ]) ts:1752129795604
+['User_7'] --&gt; ([ 1501318219108L | 'User_7' | 'Region_9' | 'MALE' ]) ts:1752129796604
+['User_3'] --&gt; ([ 1505837030890L | 'User_3' | 'Region_9' | 'FEMALE' ]) ts:1752129797604
+['User_5'] --&gt; ([ 1502470172285L | 'User_5' | 'Region_7' | 'MALE' ]) ts:1752129798604
+['User_3'] --&gt; ([ 1488690382327L | 'User_3' | 'Region_6' | 'MALE' ]) ts:1752129799604
+['User_4'] --&gt; ([ 1491280508671L | 'User_4' | 'Region_6' | 'FEMALE' ]) ts:1752129800605
+['User_3'] --&gt; ([ 1489013263388L | 'User_3' | 'Region_6' | 'FEMALE' ]) ts:1752129801604
+['User_3'] --&gt; ([ 1489156710166L | 'User_3' | 'Region_6' | 'MALE' ]) ts:1752129805540</code></p>
+</li>
+<li>
+<p>Parámetros comunes:</p>
+<ul>
+<li><code>bootstrap-server</code>: Servidor de Kafka</li>
+<li><code>quickstart</code>: Perfil de datos predefinido (users, pageviews, etc.)</li>
+<li><code>topic</code>: Nombre del topic de destino</li>
+<li><code>format</code>: Formato de los mensajes (json, avro, delimited)</li>
+<li><code>key</code>: Campo a usar como clave del mensaje</li>
+<li><code>msgRate</code>: Mensajes por segundo</li>
+<li><code>iterations</code>: Número total de mensajes a generar</li>
+</ul>
+</li>
+<li>
+<p>Ver los mensajes generados:</p>
+<p><code>bash
+sudo docker compose exec broker kafka-console-consumer \
+  --bootstrap-server localhost:9092 \
+  --topic users \
+  --from-beginning \
+  --timeout-ms 1000</code></p>
+<p>Salida:</p>
+<p><code>bash
+{"registertime":1491695010019,"userid":"User_4","regionid":"Region_1","gender":"FEMALE"}
+{"registertime":1517479500291,"userid":"User_3","regionid":"Region_8","gender":"OTHER"}
+{"registertime":1514886328356,"userid":"User_1","regionid":"Region_7","gender":"OTHER"}
+{"registertime":1501318219108,"userid":"User_7","regionid":"Region_9","gender":"MALE"}
+{"registertime":1505837030890,"userid":"User_3","regionid":"Region_9","gender":"FEMALE"}
+{"registertime":1502470172285,"userid":"User_5","regionid":"Region_7","gender":"MALE"}
+{"registertime":1488690382327,"userid":"User_3","regionid":"Region_6","gender":"MALE"}
+{"registertime":1491280508671,"userid":"User_4","regionid":"Region_6","gender":"FEMALE"}
+{"registertime":1489013263388,"userid":"User_3","regionid":"Region_6","gender":"FEMALE"}
+{"registertime":1489156710166,"userid":"User_3","regionid":"Region_6","gender":"MALE"}</code></p>
+</li>
+</ul>
+<h4>7. <strong>flink-jobmanager</strong>, <strong>flink-taskmanager</strong>, <strong>flink-sql-client</strong></h4>
+<ul>
+<li><strong>Propósito</strong>: Apache Flink para procesamiento avanzado de streams y batch, con integración directa con Kafka.</li>
+<li><strong>Imagen jobmanager/taskmanager</strong>: <code>cnfldemos/flink-kafka</code></li>
+<li><strong>Imagen sql-client</strong>: <code>cnfldemos/flink-sql-client-kafka</code></li>
+<li><strong>Puertos</strong>:</li>
+<li>JobManager UI: 8081</li>
+<li>REST API: 9081</li>
+<li>TaskManager: 6123</li>
+<li><strong>Uso</strong>:  </li>
+<li>
+<p>Acceder a la UI de Flink JobManager: <a href="http://localhost:9081">http://localhost:9081</a></p>
+<p><img alt="flink" src="../../images/kafka/kafka_flink.png" /></p>
+</li>
+<li>
+<p>Para ejecutar consultas SQL sobre Flink, primero accede al cliente SQL de Flink:</p>
+<p><code>bash
+sudo docker compose exec flink-sql-client /opt/flink/bin/sql-client.sh</code></p>
+</li>
+<li>
+<p>Ejemplo de configuración para conectarse a un topic de Kafka:</p>
+<p><code>sql
+CREATE TABLE users (
+  registertime BIGINT,
+  userid STRING,
+  regionid STRING,
+  gender STRING
+) WITH (
+  'connector' = 'kafka',
+  'topic' = 'users',
+  'properties.bootstrap.servers' = 'broker:29092',
+  'properties.group.id' = 'flink-sql-client-users',
+  'scan.startup.mode' = 'earliest-offset',
+  'format' = 'json',
+  'json.ignore-parse-errors' = 'true',
+  'properties.auto.offset.reset' = 'earliest'
+);</code></p>
+<ul>
+<li>Salida:</li>
+</ul>
+<p><code>txt
+  [INFO] Execute statement succeed.</code></p>
+<p>Consultar tabla:</p>
+<p><code>sql  
+SELECT * FROM users;</code></p>
+<ul>
+<li>Salida:</li>
+</ul>
+<p><img alt="flink" src="../../images/kafka/kafka_flink_table.png" /></p>
+</li>
+</ul>
+<hr />
+<h2>Ejemplo de flujo de trabajo usando varios servicios</h2>
+<ol>
+<li>
+<p><strong>Produce datos demo:</strong><br />
+   ksql-datagen → test-topic</p>
+</li>
+<li>
+<p><strong>Procesa datos en streaming:</strong><br />
+   ksqldb-server (SQL streaming) o Flink (procesamiento avanzado)</p>
+</li>
+<li>
+<p><strong>Valida y evoluciona esquemas:</strong><br />
+   schema-registry</p>
+</li>
+<li>
+<p><strong>Consume datos desde una app externa:</strong>  </p>
+</li>
+<li>Usando librerías Kafka</li>
+<li>Usando REST Proxy (HTTP)</li>
+<li>Usando Kafka Connect para llevar datos a una base de datos</li>
+</ol>
+<hr />
+<h2>Recursos útiles</h2>
+<ul>
+<li><a href="https://docs.confluent.io/platform/current/overview.html">Documentación oficial de Confluent Platform</a></li>
+<li><a href="https://docs.ksqldb.io/en/latest/">Documentación de ksqlDB</a></li>
+<li><a href="https://nightlies.apache.org/flink/flink-docs-release-1.19/">Documentación de Flink</a></li>
+<li><a href="https://docs.confluent.io/platform/current/kafka-rest/index.html">API REST Proxy</a></li>
+<li><a href="https://docs.confluent.io/platform/current/schema-registry/develop/api.html">Schema Registry API</a></li>
+<li><a href="https://docs.confluent.io/platform/current/connect/index.html">Kafka Connect</a></li>
+</ul>
+<hr />
+<ul>
+<li><a href="https://github.com/confluentinc/cp-all-in-one">Repositorio cp-all-in-one (Confluent)</a></li>
+<li><a href="https://kafka.apache.org/documentation/">Documentación oficial de Kafka</a></li>
+</ul>
+<h2>Volver a su ficha</h2>
+<p><a href="../tecnologias/kafka.html">Volver a la ficha de Kafka</a></p></body></html>

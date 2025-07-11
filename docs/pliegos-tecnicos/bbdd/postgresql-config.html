@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>postgresql-config</title>
+    <style>
+        body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px;}
+        pre{background:#f5f5f5;padding:1em;overflow-x:auto;}
+        code{font-family:Consolas,monospace;}
+        h1,h2,h3{color:#2c3e50;}
+        table{border-collapse:collapse;width:100%;margin:1em 0;}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+        th{background-color:#f2f2f2;}
+        tr:nth-child(even){background-color:#f9f9f9;}
+        a{color:#3498db;text-decoration:none;}
+        a:hover{text-decoration:underline;}
+        .breadcrumb{background:#f8f9fa;padding:8px 15px;border-radius:4px;margin-bottom:20px;}
+        .breadcrumb a{color:#6c757d;}
+        .breadcrumb a:hover{color:#0056b3;}
+    </style>
+</head>
+<body><div class="breadcrumb"><a href="../index.html">Inicio</a> / <a href=../index.html>pliegos-tecnicos</a> / <span>bbdd</span></div><h1>Configuración de PostgreSQL</h1>
+<p>Guía rápida para configurar y administrar PostgreSQL en local o contenedores.</p>
+<h2>Tabla de Contenidos</h2>
+<ul>
+<li><a href="#configuración-de-postgresql">Configuración de PostgreSQL</a></li>
+<li><a href="#tabla-de-contenidos">Tabla de Contenidos</a></li>
+<li><a href="#ejemplo-con-docker">Ejemplo con Docker</a></li>
+<li><a href="#comandos-útiles">Comandos útiles</a><ul>
+<li><a href="#acceder-al-contenedor-postgresql">Acceder al contenedor PostgreSQL</a></li>
+<li><a href="#acceder-a-postgresql-como-usuario-admin">Acceder a PostgreSQL como usuario admin</a></li>
+<li><a href="#crear-una-base-de-datos">Crear una base de datos</a></li>
+<li><a href="#crear-un-usuario-y-otorgar-permisos">Crear un usuario y otorgar permisos</a></li>
+<li><a href="#importar-un-dump-sql">Importar un dump SQL</a></li>
+<li><a href="#exportar-una-base-de-datos">Exportar una base de datos</a></li>
+</ul>
+</li>
+<li><a href="#configuraciones-clave">Configuraciones clave</a></li>
+<li><a href="#recomendaciones">Recomendaciones</a></li>
+<li><a href="#enlaces-útiles">Enlaces útiles</a></li>
+<li><a href="#volver-a-su-ficha">Volver a su ficha</a></li>
+</ul>
+<h2>Ejemplo con Docker</h2>
+<pre><code class="language-yaml">services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    ports:
+      - &quot;5432:5432&quot;
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: myapp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+volumes:
+  postgres_data:
+</code></pre>
+<h2>Comandos útiles</h2>
+<h3>Acceder al contenedor PostgreSQL</h3>
+<pre><code class="language-bash">docker exec -it postgres bash
+</code></pre>
+<h3>Acceder a PostgreSQL como usuario admin</h3>
+<pre><code class="language-bash">psql -U admin -d myapp
+</code></pre>
+<h3>Crear una base de datos</h3>
+<pre><code class="language-sql">CREATE DATABASE ejemplo;
+</code></pre>
+<h3>Crear un usuario y otorgar permisos</h3>
+<pre><code class="language-sql">CREATE USER usuario WITH PASSWORD 'contraseña';
+GRANT ALL PRIVILEGES ON DATABASE ejemplo TO usuario;
+</code></pre>
+<h3>Importar un dump SQL</h3>
+<pre><code class="language-bash">psql -U admin -d ejemplo &lt; backup.sql
+</code></pre>
+<h3>Exportar una base de datos</h3>
+<pre><code class="language-bash">pg_dump -U admin -d ejemplo &gt; backup.sql
+</code></pre>
+<h2>Configuraciones clave</h2>
+<ul>
+<li><strong>POSTGRES_USER</strong>: Nombre de usuario para autenticación.</li>
+<li><strong>POSTGRES_PASSWORD</strong>: Contraseña del usuario administrador.</li>
+<li><strong>POSTGRES_DB</strong>: Nombre de la base de datos inicial.</li>
+<li><strong>ports</strong>: Mapea el puerto 5432 del contenedor al host para acceso externo.</li>
+<li><strong>volumes</strong>: Almacena datos de forma persistente en el volumen <code>postgres_data</code>.</li>
+</ul>
+<h2>Recomendaciones</h2>
+<ul>
+<li>Habilita SSL/TLS en producción para conexiones seguras.</li>
+<li>Configura índices para consultas frecuentes y optimiza el planificador de consultas.</li>
+<li>Usa <code>pg_hba.conf</code> para controlar el acceso a la base de datos.</li>
+<li>Integra con Kafka Connect usando conectores como <code>io.debezium.connector.postgresql.PostgresConnector</code> para streaming de datos.</li>
+<li>Monitorea el rendimiento con herramientas como <code>pg_stat_statements</code>.</li>
+</ul>
+<h2>Enlaces útiles</h2>
+<ul>
+<li><a href="https://www.postgresql.org/">Sitio oficial de PostgreSQL</a></li>
+<li><a href="https://www.postgresql.org/docs/">Documentación de PostgreSQL</a></li>
+</ul>
+<h2>Volver a su ficha</h2>
+<p><a href="../../tecnologias/bbdd/postgresql.html">Volver a la ficha de PostgreSQL</a></p></body></html>

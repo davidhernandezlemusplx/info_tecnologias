@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>neo4j-config</title>
+    <style>
+        body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px;}
+        pre{background:#f5f5f5;padding:1em;overflow-x:auto;}
+        code{font-family:Consolas,monospace;}
+        h1,h2,h3{color:#2c3e50;}
+        table{border-collapse:collapse;width:100%;margin:1em 0;}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+        th{background-color:#f2f2f2;}
+        tr:nth-child(even){background-color:#f9f9f9;}
+        a{color:#3498db;text-decoration:none;}
+        a:hover{text-decoration:underline;}
+        .breadcrumb{background:#f8f9fa;padding:8px 15px;border-radius:4px;margin-bottom:20px;}
+        .breadcrumb a{color:#6c757d;}
+        .breadcrumb a:hover{color:#0056b3;}
+    </style>
+</head>
+<body><div class="breadcrumb"><a href="../index.html">Inicio</a> / <a href=../index.html>pliegos-tecnicos</a> / <span>bbdd</span></div><h1>Configuración de Neo4j</h1>
+<p><img alt="raw" src="../../../images/bbdd/neo4j/neo4j.png" /></p>
+<p>Guía rápida para configurar y administrar Neo4j en local o contenedores.</p>
+<h2>Tabla de Contenidos</h2>
+<ul>
+<li><a href="#configuración-de-neo4j">Configuración de Neo4j</a></li>
+<li><a href="#tabla-de-contenidos">Tabla de Contenidos</a></li>
+<li><a href="#prerrequisitos">Prerrequisitos</a></li>
+<li><a href="#paso-1-crear-un-archivo-docker-compose">Paso 1: Crear un Archivo Docker Compose</a><ul>
+<li><a href="#explicación-de-variables-de-entorno-y-configuración">Explicación de variables de entorno y configuración</a></li>
+</ul>
+</li>
+<li><a href="#paso-2-desplegar-neo4j-con-docker-compose">Paso 2: Desplegar Neo4j con Docker Compose</a><ul>
+<li><a href="#gestión-rápida-con-makefile">Gestión rápida con Makefile</a></li>
+<li><a href="#acceso-a-neo4j">Acceso a Neo4j</a></li>
+</ul>
+</li>
+<li><a href="#ejemplo-funcional">Ejemplo funcional</a><ul>
+<li><a href="#crear-nodos-con-atributos">Crear nodos con atributos</a></li>
+<li><a href="#crear-relaciones-entre-nodos">Crear relaciones entre nodos</a></li>
+<li><a href="#consultar-nodos-y-relaciones">Consultar nodos y relaciones</a></li>
+<li><a href="#actualizar-atributos-de-un-nodo">Actualizar atributos de un nodo</a></li>
+<li><a href="#eliminar-nodos-y-relaciones">Eliminar nodos y relaciones</a></li>
+</ul>
+</li>
+<li><a href="#buenas-prácticas-y-recomendaciones">Buenas prácticas y recomendaciones</a><ul>
+<li><a href="#qué-es-apoc-y-para-qué-sirve">¿Qué es APOC y para qué sirve?</a></li>
+</ul>
+</li>
+<li><a href="#comandos-útiles">Comandos útiles</a><ul>
+<li><a href="#acceder-al-contenedor-neo4j">Acceder al contenedor Neo4j</a></li>
+<li><a href="#acceder-a-la-consola-cypher-cli">Acceder a la consola Cypher (CLI)</a></li>
+<li><a href="#exportar-una-base-de-datos-dump">Exportar una base de datos (dump)</a></li>
+<li><a href="#importar-una-base-de-datos-dump">Importar una base de datos (dump)</a></li>
+</ul>
+</li>
+<li><a href="#configuración-clave">Configuración clave</a></li>
+<li><a href="#integración-con-python-y-java">Integración con Python y Java</a><ul>
+<li><a href="#python">Python</a></li>
+<li><a href="#java">Java</a></li>
+</ul>
+</li>
+<li><a href="#recomendaciones">Recomendaciones</a></li>
+<li><a href="#enlaces-útiles">Enlaces útiles</a></li>
+<li><a href="#volver-a-su-ficha">Volver a su ficha</a></li>
+</ul>
+<h2>Prerrequisitos</h2>
+<p>Antes de comenzar, asegúrate de lo siguiente:</p>
+<ul>
+<li><strong>Docker</strong> está instalado y en ejecución.</li>
+<li><strong>Docker Compose</strong> está instalado (se recomienda la versión 2.29.x o superior). Verifica con:</li>
+</ul>
+<blockquote>
+<p>Puedes utilizar el script de <code>docker_install.sh</code> de la carpeta <code>/resources</code> para instalar ambas cosas en WSL/Ubuntu.</p>
+</blockquote>
+<ul>
+<li>Tienes suficiente espacio en disco para los logs de Kafka (al menos 1GB para pruebas).</li>
+<li>Los puertos <code>2181</code> (Zookeeper), <code>9092</code> (broker de Kafka) y <code>29092</code> (acceso externo) están disponibles en tu máquina.</li>
+</ul>
+<h2>Paso 1: Crear un Archivo Docker Compose</h2>
+<p>El fichero pregenerado se encuentra en <code>resources/bbdd/neo4j/</code>:</p>
+<p>docker-compose.yml</p>
+<pre><code class="language-yaml">services:
+  neo4j:
+    image: neo4j:5.19
+    container_name: neo4j
+    ports:
+      - &quot;7474:7474&quot;   # Neo4j Browser (web)
+      - &quot;7687:7687&quot;   # Bolt protocol (drivers)
+    environment:
+      NEO4J_AUTH: &quot;neo4j/password&quot;  # usuario/contraseña por defecto
+      NEO4J_dbms_memory_pagecache_size: 1G
+      NEO4J_dbms_memory_heap_initial__size: 1G
+      NEO4J_dbms_memory_heap_max__size: 2G
+      NEO4J_PLUGINS: '[&quot;apoc&quot;]'   # Plugin APOC para utilidades avanzadas
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_import:/var/lib/neo4j/import
+      - neo4j_plugins:/plugins
+    restart: unless-stopped
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  neo4j_import:
+  neo4j_plugins:
+</code></pre>
+<h3>Explicación de variables de entorno y configuración</h3>
+<ul>
+<li><code>NEO4J_AUTH</code>: Usuario y contraseña inicial (formato <code>usuario/contraseña</code>).</li>
+<li><code>NEO4J_dbms_memory_pagecache_size</code>: Tamaño de caché de página para mejorar el rendimiento de lectura.</li>
+<li><code>NEO4J_dbms_memory_heap_initial__size</code> y <code>NEO4J_dbms_memory_heap_max__size</code>: Memoria heap mínima y máxima de la JVM.</li>
+<li><code>NEO4J_PLUGINS</code>: Plugins adicionales a instalar (por defecto, APOC).</li>
+<li>Volúmenes:</li>
+<li><code>neo4j_data</code>: Datos persistentes.</li>
+<li><code>neo4j_logs</code>: Logs del sistema.</li>
+<li><code>neo4j_import</code>: Carpeta para importar datos.</li>
+<li><code>neo4j_plugins</code>: Plugins externos.</li>
+</ul>
+<p>Puedes modificar estos valores según las necesidades del entorno de desarrollo o pruebas.</p>
+<h2>Paso 2: Desplegar Neo4j con Docker Compose</h2>
+<p>Inicia los contenedores de Neo4j usando Docker Compose.</p>
+<pre><code class="language-bash">docker-compose up -d
+</code></pre>
+<ul>
+<li><strong>Explicación</strong>:</li>
+<li>El flag <code>-d</code> ejecuta los contenedores en segundo plano.</li>
+<li>
+<p>Verifica que los contenedores estén en ejecución:</p>
+<p><code>bash
+docker ps</code></p>
+<p>Deberías ver un contenedor: <code>neo4j</code>.</p>
+</li>
+</ul>
+<hr />
+<h3>Gestión rápida con Makefile</h3>
+<p>En la carpeta <code>resources/bbdd/neo4j/</code> tienes un <code>Makefile</code> preparado para gestionar Neo4j fácilmente:</p>
+<pre><code class="language-makefile">NEO4J_COMPOSE=docker-compose.yml
+
+up:
+    docker compose -f $(NEO4J_COMPOSE) up -d
+
+down:
+    docker compose -f $(NEO4J_COMPOSE) down
+
+restart:
+    docker compose -f $(NEO4J_COMPOSE) restart
+
+logs:
+    docker compose -f $(NEO4J_COMPOSE) logs -f
+</code></pre>
+<p>Ejecuta los siguientes comandos desde esa carpeta:</p>
+<ul>
+<li>Levantar Neo4j:</li>
+</ul>
+<p><code>bash
+  make up</code></p>
+<ul>
+<li>Parar Neo4j:</li>
+</ul>
+<p><code>bash
+  make down</code></p>
+<ul>
+<li>Reiniciar Neo4j:</li>
+</ul>
+<p><code>bash
+  make restart</code></p>
+<ul>
+<li>Ver logs:</li>
+</ul>
+<p><code>bash
+  make logs</code></p>
+<blockquote>
+<p><strong>Nota:</strong> Para usar los comandos <code>make</code>, asegúrate de tener instalado el paquete <code>make</code>.
+Puedes instalarlo en sistemas basados en Debian/Ubuntu con:</p>
+</blockquote>
+<pre><code class="language-bash">sudo apt install make
+</code></pre>
+<h3>Acceso a Neo4j</h3>
+<ul>
+<li>Navegador web: <a href="http://localhost:7474/">http://localhost:7474/</a></li>
+</ul>
+<p><img alt="neo4j" src="../../../images/bbdd/neo4j/neo4jui.png" /></p>
+<ul>
+<li>Usuario: <code>neo4j</code></li>
+<li>Contraseña: <code>password</code> (o la que definas en <code>NEO4J_AUTH</code>)</li>
+</ul>
+<h2>Ejemplo funcional</h2>
+<h3>Crear nodos con atributos</h3>
+<pre><code class="language-cypher">CREATE (p:Persona {nombre: 'Juan', edad: 30, ciudad: 'Madrid'})
+
+CREATE (p2:Persona {nombre: 'Ana', edad: 28, ciudad: 'Barcelona'})
+</code></pre>
+<h3>Crear relaciones entre nodos</h3>
+<pre><code class="language-cypher">MATCH (a:Persona {nombre: 'Juan'}), (b:Persona {nombre: 'Ana'})
+CREATE (a)-[:AMIGO_DE]-&gt;(b)
+</code></pre>
+<h3>Consultar nodos y relaciones</h3>
+<pre><code class="language-cypher">MATCH (p:Persona) RETURN p
+
+MATCH (a:Persona)-[r:AMIGO_DE]-&gt;(b:Persona) RETURN a, r, b
+</code></pre>
+<p><img alt="neo4j" src="../../../images/bbdd/neo4j/neo4jui_relationship.png" /></p>
+<h3>Actualizar atributos de un nodo</h3>
+<pre><code class="language-cypher">MATCH (p:Persona {nombre: 'Juan'})
+SET p.edad = 31
+RETURN p
+</code></pre>
+<h3>Eliminar nodos y relaciones</h3>
+<pre><code class="language-cypher">MATCH (p:Persona {nombre: 'Ana'})
+DETACH DELETE p
+</code></pre>
+<hr />
+<h2>Buenas prácticas y recomendaciones</h2>
+<ul>
+<li>No uses contraseñas por defecto en entornos productivos.</li>
+<li>Ajusta la memoria según el tamaño de tus datos.</li>
+<li>Usa volúmenes para persistencia y backup.</li>
+<li>Habilita plugins solo si los necesitas (ej. APOC).</li>
+<li>Usa la carpeta <code>import</code> para cargas masivas de datos.</li>
+</ul>
+<hr />
+<h3>¿Qué es APOC y para qué sirve?</h3>
+<p><strong>APOC</strong> (Awesome Procedures On Cypher) es una colección de procedimientos y funciones avanzadas para Neo4j que amplía enormemente las capacidades de Cypher. Permite realizar tareas de integración, transformación de datos, generación de grafos, utilidades de import/export, manipulación de cadenas, fechas, colecciones y mucho más.</p>
+<p><strong>Algunas utilidades comunes:</strong></p>
+<ul>
+<li>Importar/exportar datos desde/para CSV, JSON, XML, etc.</li>
+<li>Generar grafos sintéticos o de ejemplo.</li>
+<li>Manipular nodos, relaciones y propiedades de forma masiva.</li>
+<li>Consultas avanzadas de grafos, path finding, shortest path, etc.</li>
+<li>Llamar APIs externas o ejecutar código JavaScript desde Cypher.</li>
+</ul>
+<p><strong>Ejemplo práctico de uso de APOC:</strong></p>
+<p>Crear relaciones entre personas de la misma ciudad.</p>
+<p>Crear nodos Persona:</p>
+<pre><code class="language-cypher">CREATE
+  (p1:Persona {nombre: 'Juan', edad: 30, ciudad: 'Madrid', profesion: 'Ingeniero', email: 'juan@email.com', genero: 'M', empresa: 'TechCorp'}),
+  (p2:Persona {nombre: 'Ana', edad: 28, ciudad: 'Barcelona', profesion: 'Doctora', email: 'ana@email.com', genero: 'F', empresa: 'TechCorp'}),
+  (p3:Persona {nombre: 'Luis', edad: 35, ciudad: 'Madrid', profesion: 'Profesor', email: 'luis@email.com', genero: 'M', empresa: 'TechCorp'}),
+  (p4:Persona {nombre: 'María', edad: 27, ciudad: 'Valencia', profesion: 'Diseñadora', email: 'maria@email.com', genero: 'F', empresa: 'TechCorp'}),
+  (p5:Persona {nombre: 'Carlos', edad: 40, ciudad: 'Barcelona', profesion: 'Abogado', email: 'carlos@email.com', genero: 'M', empresa: 'TechCorp'}),
+  (p6:Persona {nombre: 'Lucía', edad: 32, ciudad: 'Madrid', profesion: 'Periodista', email: 'lucia@email.com', genero: 'F', empresa: 'TechCorp'}),
+  (p7:Persona {nombre: 'Elena', edad: 29, ciudad: 'Valencia', profesion: 'Arquitecta', email: 'elena@email.com', genero: 'F', empresa: 'TechCorp'}),
+  (p8:Persona {nombre: 'Miguel', edad: 31, ciudad: 'Madrid', profesion: 'Analista', email: 'miguel@email.com', genero: 'M', empresa: 'TechCorp'}),
+  (p9:Persona {nombre: 'Sergio', edad: 36, ciudad: 'Barcelona', profesion: 'Chef', email: 'sergio@email.com', genero: 'M', empresa: 'TechCorp'}),
+  (p10:Persona {nombre: 'Patricia', edad: 33, ciudad: 'Valencia', profesion: 'Psicóloga', email: 'patricia@email.com', genero: 'F', empresa: 'TechCorp'});
+</code></pre>
+<p>Crear nodos Ciudad:</p>
+<pre><code class="language-cypher">MATCH (p:Persona)
+WITH DISTINCT p.ciudad AS nombreCiudad
+MERGE (:Ciudad {nombre: nombreCiudad})
+</code></pre>
+<p>Crear relaciones entre Persona y su Ciudad:</p>
+<pre><code class="language-cypher">CALL apoc.periodic.iterate(
+  &quot;
+  MATCH (p:Persona)
+  RETURN p
+  &quot;,
+  &quot;
+  MATCH (c:Ciudad {nombre: p.ciudad})
+  MERGE (p)-[:VIVE_EN]-&gt;(c)
+  &quot;,
+  {batchSize:100, parallel:false}
+)
+</code></pre>
+<ul>
+<li>Salida:</li>
+</ul>
+<p><img alt="neo4j" src="../../../images/bbdd/neo4j/neo4jui_relationship_apoc.png" /></p>
+<blockquote>
+<p><strong>Nota:</strong> Se puede realizar sin el plugin APOC, pero es menos eficiente cuando se trata de relaciones entre nodos con mucha cantidad de relaciones.</p>
+</blockquote>
+<p>Otro ejemplo: importar datos desde un archivo CSV ubicado en el volumen <code>import</code>:</p>
+<pre><code class="language-cypher">CALL apoc.load.csv('personas.csv') YIELD map AS row
+CREATE (p:Persona {nombre: row.nombre, edad: toInteger(row.edad), ciudad: row.ciudad})
+</code></pre>
+<h2>Comandos útiles</h2>
+<h3>Acceder al contenedor Neo4j</h3>
+<pre><code class="language-bash">docker exec -it neo4j bash
+</code></pre>
+<h3>Acceder a la consola Cypher (CLI)</h3>
+<pre><code class="language-bash">cypher-shell -u neo4j -p password
+</code></pre>
+<h3>Exportar una base de datos (dump)</h3>
+<pre><code class="language-bash">neo4j-admin dump --database=neo4j --to=backup.dump
+</code></pre>
+<h3>Importar una base de datos (dump)</h3>
+<pre><code class="language-bash">neo4j-admin load --from=backup.dump --database=neo4j --force
+</code></pre>
+<h2>Configuración clave</h2>
+<ul>
+<li><strong>NEO4J_AUTH</strong>: Define el usuario y la contraseña (formato <code>usuario/contraseña</code>).</li>
+<li><strong>ports</strong>: Mapea los puertos 7474 (HTTP para la interfaz web) y 7687 (Bolt para conexiones de clientes).</li>
+<li><strong>volumes</strong>: Almacena datos y logs en volúmenes persistentes (<code>neo4j_data</code> y <code>neo4j_logs</code>).</li>
+</ul>
+<hr />
+<h2>Integración con Python y Java</h2>
+<h3>Python</h3>
+<ol>
+<li><strong>Instala el driver oficial:</strong></li>
+</ol>
+<p><code>bash
+   pip install neo4j</code></p>
+<ol>
+<li><strong>Ejemplo de conexión y consulta:</strong></li>
+</ol>
+<p>```python
+   from neo4j import GraphDatabase</p>
+<p>uri = "bolt://localhost:7687"
+   user = "neo4j"
+   password = "password"
+   driver = GraphDatabase.driver(uri, auth=(user, password))</p>
+<p>def crear_persona(tx, nombre, edad):
+       tx.run("CREATE (p:Persona {nombre: $nombre, edad: $edad})", nombre=nombre, edad=edad)</p>
+<p>with driver.session() as session:
+       session.write_transaction(crear_persona, "Pedro", 25)
+       result = session.run("MATCH (p:Persona) RETURN p.nombre AS nombre, p.edad AS edad")
+       for record in result:
+           print(record["nombre"], record["edad"])</p>
+<p>driver.close()
+   ```</p>
+<p>Más información: <a href="https://neo4j.com/docs/api/python-driver/current/">Neo4j Python Driver Docs</a></p>
+<h3>Java</h3>
+<ol>
+<li><strong>Añade la dependencia Maven:</strong></li>
+</ol>
+<p><code>xml
+   &lt;dependency&gt;
+     &lt;groupId&gt;org.neo4j.driver&lt;/groupId&gt;
+     &lt;artifactId&gt;neo4j-java-driver&lt;/artifactId&gt;
+     &lt;version&gt;5.28.7&lt;/version&gt;
+   &lt;/dependency&gt;</code></p>
+<ol>
+<li><strong>Ejemplo de conexión y consulta:</strong></li>
+</ol>
+<p>```java
+   import org.neo4j.driver.AuthTokens;
+   import org.neo4j.driver.Driver;
+   import org.neo4j.driver.GraphDatabase;
+   import org.neo4j.driver.Session;
+   import org.neo4j.driver.Result;</p>
+<p>public class Neo4jExample {
+       public static void main(String[] args) {
+           Driver driver = GraphDatabase.driver(
+               "bolt://localhost:7687",
+               AuthTokens.basic("neo4j", "password")
+           );</p>
+<pre><code>       try (Session session = driver.session()) {
+           session.writeTransaction(tx -&gt; tx.run(
+               "CREATE (p:Persona {nombre: $nombre, edad: $edad})",
+               org.neo4j.driver.Values.parameters("nombre", "Sonia", "edad", 29)
+           ));
+
+           Result result = session.run("MATCH (p:Persona) RETURN p.nombre AS nombre, p.edad AS edad");
+           while (result.hasNext()) {
+               var record = result.next();
+               System.out.println(record.get("nombre").asString() + " " + record.get("edad").asInt());
+           }
+       }
+       driver.close();
+   }
+</code></pre>
+<p>}
+   ```</p>
+<p>Más información: <a href="https://neo4j.com/docs/java-manual/current/">Neo4j Java Driver Docs</a></p>
+<hr />
+<h2>Recomendaciones</h2>
+<ul>
+<li>Usa el protocolo Bolt para conexiones de alto rendimiento.</li>
+<li>Configura índices en propiedades de nodos y relaciones para optimizar consultas Cypher.</li>
+<li>Habilita la autenticación y usa SSL en producción.</li>
+<li>Integra con Kafka Connect usando conectores como <code>streams.kafka.connect.sink.Neo4jSinkConnector</code> para sincronización de datos.</li>
+<li>Evita nodos con demasiadas relaciones ("super nodos") para mejorar el rendimiento.</li>
+</ul>
+<h2>Enlaces útiles</h2>
+<ul>
+<li><a href="https://neo4j.com/">Sitio oficial de Neo4j</a></li>
+<li><a href="https://neo4j.com/docs/">Documentación de Neo4j</a></li>
+</ul>
+<h2>Volver a su ficha</h2>
+<p><a href="../../tecnologias/bbdd/neo4j.html">Volver a la ficha de Neo4j</a></p></body></html>

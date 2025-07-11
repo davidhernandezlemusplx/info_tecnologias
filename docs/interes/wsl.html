@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>wsl</title>
+    <style>
+        body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px;}
+        pre{background:#f5f5f5;padding:1em;overflow-x:auto;}
+        code{font-family:Consolas,monospace;}
+        h1,h2,h3{color:#2c3e50;}
+        table{border-collapse:collapse;width:100%;margin:1em 0;}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+        th{background-color:#f2f2f2;}
+        tr:nth-child(even){background-color:#f9f9f9;}
+        a{color:#3498db;text-decoration:none;}
+        a:hover{text-decoration:underline;}
+        .breadcrumb{background:#f8f9fa;padding:8px 15px;border-radius:4px;margin-bottom:20px;}
+        .breadcrumb a{color:#6c757d;}
+        .breadcrumb a:hover{color:#0056b3;}
+    </style>
+</head>
+<body><div class="breadcrumb"><a href="../index.html">Inicio</a> / <span>interes</span></div><h1>Guía rápida de WSL (Windows Subsystem for Linux)</h1>
+<p><img alt="raw" src="../../images/interes/wsl.png" /></p>
+<h2>Tabla de Contenidos</h2>
+<ul>
+<li><a href="#guía-rápida-de-wsl-windows-subsystem-for-linux">Guía rápida de WSL (Windows Subsystem for Linux)</a></li>
+<li><a href="#tabla-de-contenidos">Tabla de Contenidos</a></li>
+<li><a href="#1-ver-distribuciones-disponibles-para-instalar">1. Ver distribuciones disponibles para instalar</a></li>
+<li><a href="#2-instalar-una-distribución">2. Instalar una distribución</a></li>
+<li><a href="#3-iniciar-la-distribución-recién-instalada">3. Iniciar la distribución recién instalada</a></li>
+<li><a href="#4-ver-distribuciones-instaladas-localmente">4. Ver distribuciones instaladas localmente</a></li>
+<li><a href="#5-eliminar-una-distribución-instalada">5. Eliminar una distribución instalada</a></li>
+<li><a href="#6-primer-inicio-tras-instalación">6. Primer inicio tras instalación</a></li>
+<li><a href="#7-introducir-al-usuario-al-grupo-root-opcional">7. Introducir al usuario al grupo root (opcional)</a></li>
+<li><a href="#8-actualizar-y-preparar-entorno-base">8. Actualizar y preparar entorno base</a></li>
+<li><a href="#9-opcional-definir-carpeta-de-inicio-por-defecto-al-lanzar-la-distro">9. (Opcional) Definir carpeta de inicio por defecto al lanzar la distro</a></li>
+<li><a href="#10-solución-de-errores-comunes-al-iniciar-wsl">10. Solución de errores comunes al iniciar WSL</a></li>
+<li><a href="#volver-al-readme">Volver al README</a></li>
+</ul>
+<h2>1. Ver distribuciones disponibles para instalar</h2>
+<pre><code class="language-powershell">wsl --list --online
+</code></pre>
+<hr />
+<h2>2. Instalar una distribución</h2>
+<p>Instalación:</p>
+<pre><code class="language-powershell">wsl --install &lt;NombreDistribucion&gt; [--name &lt;NombrePersonalizado&gt;]
+</code></pre>
+<p>Ejemplo:</p>
+<pre><code class="language-powershell">wsl --install Ubuntu-24.04 --name MyUbuntu
+</code></pre>
+<blockquote>
+<p>Esto te permite tener varias versiones o entornos con distintos nombres.</p>
+</blockquote>
+<hr />
+<h2>3. Iniciar la distribución recién instalada</h2>
+<pre><code class="language-powershell">wsl -d &lt;NombreDistribucion&gt;
+</code></pre>
+<p>Ejemplo:</p>
+<pre><code class="language-powershell">wsl -d MyUbuntu
+</code></pre>
+<hr />
+<h2>4. Ver distribuciones instaladas localmente</h2>
+<pre><code class="language-powershell">wsl --list --verbose
+</code></pre>
+<hr />
+<h2>5. Eliminar una distribución instalada</h2>
+<pre><code class="language-powershell">wsl --unregister &lt;NombreDistribucion&gt;
+</code></pre>
+<p>Ejemplo:</p>
+<pre><code class="language-powershell">wsl --unregister MyUbuntu
+</code></pre>
+<hr />
+<h2>6. Primer inicio tras instalación</h2>
+<p>Al iniciar WSL por primera vez con una distribución instalada, el sistema te pedirá:</p>
+<ol>
+<li>Escribir un <strong>nombre de usuario</strong> (se creará una cuenta nueva).  </li>
+<li>Introducir una <strong>contraseña</strong> para ese usuario.</li>
+</ol>
+<hr />
+<h2>7. Introducir al usuario al grupo root (opcional)</h2>
+<p>Cámbiate a root primero:</p>
+<pre><code class="language-bash">su
+</code></pre>
+<p>Luego crea el usuario y añade a sudo:</p>
+<pre><code class="language-bash">usermod -aG sudo nombre_usuario
+</code></pre>
+<p>Opcional:</p>
+<pre><code class="language-bash">echo '%sudo ALL=(ALL:ALL) ALL' &gt;&gt; /etc/sudoers
+</code></pre>
+<hr />
+<h2>8. Actualizar y preparar entorno base</h2>
+<pre><code class="language-bash">sudo apt update &amp;&amp; sudo apt upgrade -y
+sudo apt install -y curl wget git sudo
+</code></pre>
+<hr />
+<h2>9. (Opcional) Definir carpeta de inicio por defecto al lanzar la distro</h2>
+<p>Desde PowerShell:</p>
+<pre><code class="language-powershell">wsl -d MyUbuntu --cd &quot;D:\Proyectos&quot;
+</code></pre>
+<h2>10. Solución de errores comunes al iniciar WSL</h2>
+<p>Error:</p>
+<pre><code class="language-powershell">Error de inicio de sesión: el usuario no tiene permisos para el tipo de inicio de sesión solicitado en el equipo.
+Código de error: Wsl/Service/CreateInstance/CreateVm/HCS/0x80070569
+</code></pre>
+<p>Causa:
+Este error suele aparecer cuando el servicio de virtualización no está habilitado correctamente o no se poseen los permisos necesarios.</p>
+<p>Solución:
+Ejecuta PowerShell como administrador y lanza estos comandos uno a uno:</p>
+<pre><code class="language-powershell">Get-Service vmcompute | Restart-Service
+</code></pre>
+<blockquote>
+<p>Get-Service vmcompute | Restart-Service reinicia el servicio de máquinas virtuales</p>
+</blockquote>
+<pre><code class="language-powershell">gpupdate /force
+</code></pre>
+<p>Salida:</p>
+<pre><code class="language-powershell">Actualizando directiva...
+
+La actualización de la directiva de equipo se completó correctamente.
+Se completó correctamente la Actualización de directiva de usuario.
+</code></pre>
+<blockquote>
+<p>gpupdate /force actualiza las políticas de grupo, aplicando cambios de permisos</p>
+</blockquote>
+<p>Después de esto, reinicia tu equipo si te lo pide, y vuelve a intentar iniciar la distribución WSL.</p>
+<h2><a href="../../index.html">⬅ Volver al Readme</a></h2></body></html>

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>marquez-config</title>
+    <style>
+        body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px;}
+        pre{background:#f5f5f5;padding:1em;overflow-x:auto;}
+        code{font-family:Consolas,monospace;}
+        h1,h2,h3{color:#2c3e50;}
+        table{border-collapse:collapse;width:100%;margin:1em 0;}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+        th{background-color:#f2f2f2;}
+        tr:nth-child(even){background-color:#f9f9f9;}
+        a{color:#3498db;text-decoration:none;}
+        a:hover{text-decoration:underline;}
+        .breadcrumb{background:#f8f9fa;padding:8px 15px;border-radius:4px;margin-bottom:20px;}
+        .breadcrumb a{color:#6c757d;}
+        .breadcrumb a:hover{color:#0056b3;}
+    </style>
+</head>
+<body><div class="breadcrumb"><a href="../index.html">Inicio</a> / <a href=../index.html>pliegos-tecnicos</a> / <span>bbdd</span></div><h1>Configuración de Marquez</h1>
+<p><img alt="Marquez Logo" src="../../../images/bbdd/marquez/marquez.png" /></p>
+<p>Guía detallada para configurar y administrar Marquez en contenedores Docker.</p>
+<h2>Tabla de Contenidos</h2>
+<ul>
+<li><a href="#configuración-de-marquez">Configuración de Marquez</a></li>
+<li><a href="#tabla-de-contenidos">Tabla de Contenidos</a></li>
+<li><a href="#prerequisitos">Prerequisitos</a></li>
+<li><a href="#paso-1-configuración-con-docker-compose">Paso 1: Configuración con Docker Compose</a></li>
+<li><a href="#paso-2-iniciar-el-contenedor">Paso 2: Iniciar el contenedor</a><ul>
+<li><a href="#gestión-rápida-con-makefile">Gestión rápida con Makefile</a></li>
+</ul>
+</li>
+<li><a href="#paso-3-acceso-y-operaciones-básicas">Paso 3: Acceso y operaciones básicas</a><ul>
+<li><a href="#acceso-a-la-interfaz-web">Acceso a la interfaz web</a></li>
+<li><a href="#uso-de-la-api">Uso de la API</a></li>
+</ul>
+</li>
+<li><a href="#configuraciones-recomendadas">Configuraciones recomendadas</a><ul>
+<li><a href="#ajustes-de-rendimiento">Ajustes de rendimiento</a></li>
+<li><a href="#seguridad">Seguridad</a></li>
+</ul>
+</li>
+<li><a href="#solución-de-problemas">Solución de problemas</a><ul>
+<li><a href="#verificar-estado-de-los-servicios">Verificar estado de los servicios</a></li>
+<li><a href="#acceder-a-los-logs-de-postgresql">Acceder a los logs de PostgreSQL</a></li>
+<li><a href="#verificar-uso-de-recursos">Verificar uso de recursos</a></li>
+</ul>
+</li>
+<li><a href="#enlaces-útiles">Enlaces útiles</a></li>
+<li><a href="#volver-a-su-ficha">Volver a su ficha</a></li>
+</ul>
+<h2>Prerequisitos</h2>
+<p>Antes de comenzar, asegúrate de lo siguiente:</p>
+<ul>
+<li><strong>Docker</strong> está instalado y en ejecución.</li>
+<li><strong>Docker Compose</strong> está instalado (se recomienda la versión 2.29.x o superior).</li>
+<li><strong>Make</strong> (opcional, pero recomendado para simplificar los comandos).</li>
+</ul>
+<blockquote>
+<p>Puedes utilizar el script de <code>docker_install.sh</code> de la carpeta <code>/resources</code> para instalar ambas cosas en WSL/Ubuntu.</p>
+</blockquote>
+<h2>Paso 1: Configuración con Docker Compose</h2>
+<p>Crea un archivo <code>docker-compose.yml</code> con la siguiente configuración. Puedes encontrar los archivos de configuración en el directorio <code>/resources/bbdd/marquez/</code>:</p>
+<p>docker-compose.yml</p>
+<pre><code class="language-yaml">services:
+  marquez:
+    image: marquezproject/marquez:latest
+    container_name: marquez
+    ports:
+      - &quot;5000:5000&quot;  # API
+      - &quot;5001:5001&quot;  # Web UI
+    environment:
+      MARQUEZ_DB_URL: jdbc:postgresql://postgres:5432/marquez
+      MARQUEZ_DB_USERNAME: admin
+      MARQUEZ_DB_PASSWORD: admin123
+    restart: unless-stopped
+
+volumes:
+  marquez_data:
+</code></pre>
+<h2>Paso 2: Iniciar el contenedor</h2>
+<p>Inicia el contenedor de Marquez usando Docker Compose:</p>
+<pre><code class="language-bash">docker-compose up -d
+</code></pre>
+<h3>Gestión rápida con Makefile</h3>
+<p>Crea un archivo <code>Makefile</code> con los siguientes comandos útiles:</p>
+<pre><code class="language-makefile">MARQUEZ_COMPOSE=docker-compose.yml
+
+# Iniciar el contenedor
+up:
+    docker-compose -f $(MARQUEZ_COMPOSE) up -d
+
+# Detener y eliminar el contenedor
+down:
+    docker-compose -f $(MARQUEZ_COMPOSE) down
+
+# Mostrar logs del contenedor
+logs:
+    docker-compose -f $(MARQUEZ_COMPOSE) logs -f
+
+# Reiniciar el contenedor
+restart:
+    docker-compose -f $(MARQUEZ_COMPOSE) restart
+</code></pre>
+<p>Ejecuta los siguientes comandos desde esa carpeta:</p>
+<ul>
+<li>Levantar Marquez:</li>
+</ul>
+<p><code>bash
+  make up</code></p>
+<ul>
+<li>Parar Marquez:</li>
+</ul>
+<p><code>bash
+  make down</code></p>
+<ul>
+<li>Reiniciar Marquez:</li>
+</ul>
+<p><code>bash
+  make restart</code></p>
+<ul>
+<li>Ver logs:</li>
+</ul>
+<p><code>bash
+  make logs</code></p>
+<blockquote>
+<p><strong>Nota:</strong> Para usar los comandos <code>make</code>, asegúrate de tener instalado el paquete <code>make</code>.
+Puedes instalarlo en sistemas basados en Debian/Ubuntu con:</p>
+</blockquote>
+<pre><code class="language-bash">sudo apt install make
+</code></pre>
+<h2>Paso 3: Acceso y operaciones básicas</h2>
+<h3>Acceso a la interfaz web</h3>
+<p>Una vez iniciados los contenedores, puedes acceder a la interfaz web de Marquez en:</p>
+<ul>
+<li><strong>URL Interfaz Web</strong>: <a href="http://localhost:5001">http://localhost:5001</a></li>
+<li><strong>URL Interfaz Web</strong>: <a href="http://localhost:5000">http://localhost:5000</a></li>
+<li><strong>URL Interfaz Web</strong>: <a href="http://localhost:5000/api/v1/namespaces">http://localhost:5000/api/v1/namespaces</a></li>
+</ul>
+<p><img alt="Marquez Web" src="../../../images/bbdd/marquez/marquez-ui.png" /></p>
+<h3>Uso de la API</h3>
+<p>La API de Marquez está disponible en el puerto 5000. Algunos ejemplos de uso:</p>
+<pre><code class="language-bash"># Listar namespaces
+curl http://localhost:5000/api/v1/namespaces
+
+# Listar jobs
+curl http://localhost:5000/api/v1/jobs
+
+# Obtener información de un job específico
+curl http://localhost:5000/api/v1/namespaces/NAMESPACE/jobs/JOB_NAME
+</code></pre>
+<h2>Configuraciones recomendadas</h2>
+<h3>Ajustes de rendimiento</h3>
+<pre><code class="language-yaml">services:
+  marquez:
+    # ...
+    environment:
+      # Ajustar el tamaño del pool de conexiones
+      MARQUEZ_DB_CONNECTION_POOL_SIZE: 10
+      # Deshabilitar el registro detallado en producción
+      MARQUEZ_LOG_LEVEL: INFO
+</code></pre>
+<h3>Seguridad</h3>
+<pre><code class="language-yaml">services:
+  marquez:
+    # ...
+    environment:
+      # Habilitar autenticación básica
+      MARQUEZ_AUTH_ENABLED: &quot;true&quot;
+      MARQUEZ_AUTH_USERNAME: admin
+      MARQUEZ_AUTH_PASSWORD: contraseña_segura
+</code></pre>
+<h2>Solución de problemas</h2>
+<h3>Verificar estado de los servicios</h3>
+<pre><code class="language-bash">docker-compose ps
+docker-compose logs marquez
+</code></pre>
+<h3>Acceder a los logs de PostgreSQL</h3>
+<pre><code class="language-bash">docker-compose logs postgres
+</code></pre>
+<h3>Verificar uso de recursos</h3>
+<pre><code class="language-bash">docker stats marquez marquez-postgres
+</code></pre>
+<h2>Enlaces útiles</h2>
+<ul>
+<li><a href="https://marquezproject.ai/">Sitio oficial de Marquez</a></li>
+<li><a href="https://marquezproject.ai/docs/">Documentación de Marquez</a></li>
+</ul>
+<h2>Volver a su ficha</h2>
+<p><a href="../../tecnologias/bbdd/marquez.html">Volver a la ficha de Marquez</a></p></body></html>

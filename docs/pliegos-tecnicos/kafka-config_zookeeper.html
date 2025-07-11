@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>kafka-config_zookeeper</title>
+    <style>
+        body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px;}
+        pre{background:#f5f5f5;padding:1em;overflow-x:auto;}
+        code{font-family:Consolas,monospace;}
+        h1,h2,h3{color:#2c3e50;}
+        table{border-collapse:collapse;width:100%;margin:1em 0;}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+        th{background-color:#f2f2f2;}
+        tr:nth-child(even){background-color:#f9f9f9;}
+        a{color:#3498db;text-decoration:none;}
+        a:hover{text-decoration:underline;}
+        .breadcrumb{background:#f8f9fa;padding:8px 15px;border-radius:4px;margin-bottom:20px;}
+        .breadcrumb a{color:#6c757d;}
+        .breadcrumb a:hover{color:#0056b3;}
+    </style>
+</head>
+<body><div class="breadcrumb"><a href="../index.html">Inicio</a> / <span>pliegos-tecnicos</span></div><h1>Configuración de Apache Kafka en Contenedores</h1>
+<p><img alt="raw" src="../../images/kafka/kafka.png" /></p>
+<p>Esta guía proporciona instrucciones detalladas para instalar y desplegar Apache Kafka en un contenedor Docker, asegurando compatibilidad en todas las plataformas (Linux, macOS, Windows, incluyendo WSL).</p>
+<h2>Tabla de Contenidos</h2>
+<ul>
+<li><a href="#configuración-de-apache-kafka-en-contenedores">Configuración de Apache Kafka en Contenedores</a></li>
+<li><a href="#tabla-de-contenidos">Tabla de Contenidos</a></li>
+<li><a href="#prerrequisitos">Prerrequisitos</a></li>
+<li><a href="#paso-1-crear-un-archivo-docker-compose">Paso 1: Crear un Archivo Docker Compose</a></li>
+<li><a href="#paso-2-desplegar-kafka-con-docker-compose">Paso 2: Desplegar Kafka con Docker Compose</a><ul>
+<li><a href="#gestión-rápida-con-makefile">Gestión rápida con Makefile</a></li>
+</ul>
+</li>
+<li><a href="#paso-3-verificar-el-despliegue">Paso 3: Verificar el Despliegue</a></li>
+<li><a href="#paso-4-integración-con-herramientas-de-kafka">Paso 4: Integración con Herramientas de Kafka</a></li>
+<li><a href="#paso-5-gestión-de-los-contenedores-de-kafka">Paso 5: Gestión de los Contenedores de Kafka</a></li>
+<li><a href="#consejos-para-compatibilidad-multiplataforma">Consejos para Compatibilidad Multiplataforma</a></li>
+<li><a href="#resolución-de-problemas">Resolución de Problemas</a></li>
+<li><a href="#recursos-adicionales">Recursos Adicionales</a></li>
+<li><a href="#volver-a-su-ficha">Volver a su ficha</a></li>
+</ul>
+<h2>Prerrequisitos</h2>
+<p>Antes de comenzar, asegúrate de lo siguiente:</p>
+<ul>
+<li><strong>Docker</strong> está instalado y en ejecución.</li>
+<li><strong>Docker Compose</strong> está instalado (se recomienda la versión 2.29.x o superior). Verifica con:</li>
+</ul>
+<blockquote>
+<p>Puedes utilizar el script de <code>docker_install.sh</code> de la carpeta <code>/resources</code> para instalar ambas cosas en WSL/Ubuntu.</p>
+</blockquote>
+<ul>
+<li>Tienes suficiente espacio en disco para los logs de Kafka (al menos 1GB para pruebas).</li>
+<li>Los puertos <code>2181</code> (Zookeeper), <code>9092</code> (broker de Kafka) y <code>29092</code> (acceso externo) están disponibles en tu máquina.</li>
+</ul>
+<h2>Paso 1: Crear un Archivo Docker Compose</h2>
+<p>Crea un archivo <code>docker-compose.yml</code> para definir un clúster de Kafka de un solo nodo con Zookeeper, <strong>configurando las propiedades de Kafka directamente mediante variables de entorno</strong>. Tambien puedes usar el fichero pregenerado de la carpeta <code>resources/kafka/</code> Este setup garantiza consistencia en todas las plataformas.</p>
+<p>docker-compose.yml</p>
+<pre><code class="language-yml">services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    ports:
+      - &quot;2181:2181&quot;
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: [&quot;CMD&quot;, &quot;echo&quot;, &quot;ru&quot;, &quot;|&quot;, &quot;nc&quot;, &quot;localhost&quot;, &quot;2181&quot;]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - &quot;9092:9092&quot;   # Para otros contenedores (Kafka UI)
+      - &quot;29092:29092&quot; # Para el host local (kcat, etc)
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,HOST://localhost:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    healthcheck:
+      test: [&quot;CMD&quot;, &quot;kafka-topics&quot;, &quot;--bootstrap-server&quot;, &quot;kafka:9092&quot;, &quot;--list&quot;]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - &quot;8080:8080&quot;
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+
+volumes:
+  kafka_data:
+  zookeeper_data:
+</code></pre>
+<ul>
+<li><strong>Explicación</strong>:</li>
+<li><strong>Imágenes</strong>: Usa <code>confluentinc/cp-zookeeper:7.5.0</code> para Zookeeper, <code>confluentinc/cp-kafka:7.5.0</code> para Kafka y <code>provectuslabs/kafka-ui:latest</code> para Kafka UI.</li>
+<li><strong>Nombres de contenedor</strong>: Asigna nombres fijos (<code>zookeeper</code>, <code>kafka</code>) para referencia sencilla.</li>
+<li><strong>Puertos</strong>:<ul>
+<li>Zookeeper: Mapea el <code>2181</code> para conexiones de cliente.</li>
+<li>Kafka: Mapea el <code>9092</code> para comunicación interna y <code>29092</code> para acceso externo desde el host.</li>
+<li>Kafka UI: Mapea el <code>8080</code> para acceso externo desde el host.</li>
+</ul>
+</li>
+<li><strong>Variables de entorno</strong>:<ul>
+<li>KAFKA_BROKER_ID: Identificador único del broker</li>
+<li>KAFKA_ZOOKEEPER_CONNECT: Conexión a Zookeeper</li>
+<li>KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: Configura los protocolos de seguridad</li>
+<li>KAFKA_LISTENERS: Configura interfaces de escucha</li>
+<li>KAFKA_ADVERTISED_LISTENERS: Configura listeners anunciados</li>
+<li>KAFKA_INTER_BROKER_LISTENER_NAME: Configura el listener interno</li>
+<li>KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: Replicación para topics internos</li>
+<li>KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: Replicación para topics de transacciones</li>
+<li>KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: Minimo de replicas para topics de transacciones</li>
+</ul>
+</li>
+<li><strong>Volúmenes</strong>:<ul>
+<li><code>zookeeper_data</code>: Persisten datos de Zookeeper.</li>
+<li><code>kafka_data</code>: Persiste los logs de Kafka.</li>
+</ul>
+</li>
+<li><strong>Healthcheck</strong>: Verifica que Kafka esté operativo listando los topics.</li>
+<li><strong>Depends On</strong>: Garantiza que Kafka arranque después de Zookeeper.</li>
+<li><strong>Flujo de Comunicación</strong>:<ul>
+<li><img alt="raw" src="../../images/kafka/kafka_flujo.png" /></li>
+</ul>
+</li>
+</ul>
+<h2>Paso 2: Desplegar Kafka con Docker Compose</h2>
+<p>Inicia los contenedores de Zookeeper y Kafka usando Docker Compose.</p>
+<pre><code class="language-bash">docker-compose up -d
+</code></pre>
+<ul>
+<li><strong>Explicación</strong>:</li>
+<li>El flag <code>-d</code> ejecuta los contenedores en segundo plano.</li>
+<li>
+<p>Verifica que los contenedores estén en ejecución:</p>
+<p><code>bash
+docker ps</code></p>
+<p>Deberías ver dos contenedores: <code>zookeeper</code> y <code>kafka</code>.</p>
+</li>
+</ul>
+<hr />
+<h3>Gestión rápida con Makefile</h3>
+<p>En la carpeta <code>resources/kafka/</code> tienes un <code>Makefile</code> preparado para gestionar Kafka fácilmente:</p>
+<pre><code class="language-makefile">KAFKA_COMPOSE=docker-compose.yml
+
+up:
+    docker compose -f $(KAFKA_COMPOSE) up -d
+
+down:
+    docker compose -f $(KAFKA_COMPOSE) down
+
+restart:
+    docker compose -f $(KAFKA_COMPOSE) restart
+
+logs:
+    docker compose -f $(KAFKA_COMPOSE) logs -f
+</code></pre>
+<p>Ejecuta los siguientes comandos desde esa carpeta:</p>
+<ul>
+<li>Levantar Kafka:</li>
+</ul>
+<p><code>bash
+  make up</code></p>
+<ul>
+<li>Parar Kafka:</li>
+</ul>
+<p><code>bash
+  make down</code></p>
+<ul>
+<li>Reiniciar Kafka:</li>
+</ul>
+<p><code>bash
+  make restart</code></p>
+<ul>
+<li>Ver logs:</li>
+</ul>
+<p><code>bash
+  make logs</code></p>
+<blockquote>
+<p><strong>Nota:</strong> Para usar los comandos <code>make</code>, asegúrate de tener instalado el paquete <code>make</code>.
+Puedes instalarlo en sistemas basados en Debian/Ubuntu con:</p>
+</blockquote>
+<pre><code class="language-bash">sudo apt install make
+</code></pre>
+<hr />
+<h2>Paso 3: Verificar el Despliegue</h2>
+<ol>
+<li><strong>Revisar los logs de los contenedores</strong>:</li>
+</ol>
+<p>Asegúrate de que Zookeeper y Kafka estén funcionando sin errores:</p>
+<p><code>bash
+   docker logs zookeeper
+   docker logs kafka</code></p>
+<ol>
+<li><strong>Probar la conectividad de Kafka</strong>:
+   Usa las herramientas de línea de comandos dentro del contenedor para crear y listar un topic:</li>
+</ol>
+<p><code>bash
+   docker exec -it kafka kafka-topics --bootstrap-server localhost:9092 --create --topic test-topic --partitions 1 --replication-factor 1
+   docker exec -it kafka kafka-topics --bootstrap-server localhost:9092 --list</code></p>
+<p>Deberías ver <code>test-topic</code> en la salida.</p>
+<ol>
+<li><strong>Probar acceso externo</strong>:
+   Desde el host, usa <code>kcat</code> para verificar la conectividad. Instala <code>kcat</code>:</li>
+</ol>
+<p><code>bash
+   sudo apt install -y kcat</code></p>
+<p>Produce un mensaje al topic:</p>
+<p><code>bash
+   echo "mensaje de prueba" | kcat -b localhost:29092 -t test-topic -P</code></p>
+<p>Consume el mensaje:</p>
+<p><code>bash
+   kcat -b localhost:29092 -t test-topic -C</code></p>
+<p>Verificar en Kafka UI:
+   Una vez que los contenedores estén en ejecución, abre tu navegador y accede a:</p>
+<ul>
+<li>Abre <a href="http://localhost:8080/">http://localhost:8080/</a>
+  <img alt="raw" src="../../images/kafka/kafkaui.png" /></li>
+<li>Navega a "Topics" y verifica que puedes ver el topic creado</li>
+<li>En "Messages", prueba a enviar un mensaje directamente desde la interfaz
+  <img alt="raw" src="../../images/kafka/kafkaui_mensajes.png" /></li>
+</ul>
+<h2>Paso 4: Integración con Herramientas de Kafka</h2>
+<p>Kafka soporta varios clientes (por ejemplo, <code>confluent-kafka</code> para Python, clientes Java de Kafka). Ejemplo con Python:</p>
+<ol>
+<li>Instala <code>confluent-kafka</code>:</li>
+</ol>
+<p><code>bash
+   pip install confluent-kafka</code></p>
+<ol>
+<li>Produce y consume mensajes:</li>
+</ol>
+<p>```python
+   from confluent_kafka import Producer, Consumer, KafkaError</p>
+<p># Productor
+   producer = Producer({'bootstrap.servers': 'localhost:29092'})
+   producer.produce('test-topic', value='¡Hola, Kafka!')
+   producer.flush()</p>
+<p># Consumidor
+   consumer = Consumer({
+       'bootstrap.servers': 'localhost:29092',
+       'group.id': 'test-group',
+       'auto.offset.reset': 'earliest'
+   })
+   consumer.subscribe(['test-topic'])
+   msg = consumer.poll(1.0)
+   if msg and not msg.error():
+       print(f"Recibido: {msg.value().decode('utf-8')}")
+   consumer.close()
+   ```</p>
+<h2>Paso 5: Gestión de los Contenedores de Kafka</h2>
+<ul>
+<li><strong>Detener los contenedores</strong>:</li>
+</ul>
+<p><code>bash
+  docker-compose down</code></p>
+<p>Esto detiene y elimina los contenedores pero preserva los volúmenes.</p>
+<ul>
+<li><strong>Reiniciar los contenedores</strong>:</li>
+</ul>
+<p><code>bash
+  docker-compose up -d</code></p>
+<ul>
+<li><strong>Eliminar volúmenes (si es necesario)</strong>:
+  Para borrar todos los datos de Kafka y Zookeeper:</li>
+</ul>
+<p><code>bash
+  docker volume rm kafka_data zookeeper_data</code></p>
+<h2>Consejos para Compatibilidad Multiplataforma</h2>
+<ul>
+<li><strong>Volúmenes de Docker</strong>: Los volúmenes <code>zookeeper_data</code>, <code>zookeeper_log</code> y <code>kafka_data</code> aseguran persistencia de datos entre reinicios y son compatibles con todas las plataformas soportadas por Docker.</li>
+<li><strong>Conflictos de puertos</strong>: Si los puertos <code>2181</code>, <code>9092</code> o <code>29092</code> están en uso, modifica el <code>docker-compose.yml</code> para usar otros puertos (ejemplo: <code>2182:2181</code>, <code>9093:9092</code>).</li>
+<li><strong>Notas para WSL</strong>: En WSL, accede a Kafka vía <code>localhost:29092</code> desde Windows. Asegúrate de que Docker Desktop esté integrado con WSL2 o usa la instalación manual de Docker.</li>
+</ul>
+<h2>Resolución de Problemas</h2>
+<ul>
+<li><strong>Los contenedores no inician</strong>:
+  Revisa los logs:</li>
+</ul>
+<p><code>bash
+  docker logs zookeeper
+  docker logs kafka</code></p>
+<p>Problemas comunes: conflictos de puertos, memoria insuficiente o Zookeeper no listo antes de Kafka.</p>
+<ul>
+<li>
+<p><strong>No se puede conectar a Kafka</strong>:
+  Asegúrate de usar <code>localhost:29092</code> para acceso externo. Para acceso interno en la red Docker, usa <code>kafka:9092</code>.</p>
+</li>
+<li>
+<p><strong>Los datos no persisten</strong>:
+  Verifica que existan los volúmenes:</p>
+</li>
+</ul>
+<p><code>bash
+  docker volume ls | grep kafka</code></p>
+<h2>Recursos Adicionales</h2>
+<ul>
+<li><a href="https://docs.confluent.io/platform/current/installation/docker/">Documentación Docker de Confluent Kafka</a></li>
+<li><a href="https://kafka.apache.org/documentation/">Documentación de Apache Kafka</a></li>
+<li><a href="https://kafka.apache.org/documentation/#kraft">Guía de Modo KRaft</a></li>
+</ul>
+<h2>Volver a su ficha</h2>
+<p><a href="../tecnologias/kafka.html">Volver a la ficha de Kafka</a></p></body></html>

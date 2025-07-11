@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>kafka</title>
+    <style>
+        body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px;}
+        pre{background:#f5f5f5;padding:1em;overflow-x:auto;}
+        code{font-family:Consolas,monospace;}
+        h1,h2,h3{color:#2c3e50;}
+        table{border-collapse:collapse;width:100%;margin:1em 0;}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+        th{background-color:#f2f2f2;}
+        tr:nth-child(even){background-color:#f9f9f9;}
+        a{color:#3498db;text-decoration:none;}
+        a:hover{text-decoration:underline;}
+        .breadcrumb{background:#f8f9fa;padding:8px 15px;border-radius:4px;margin-bottom:20px;}
+        .breadcrumb a{color:#6c757d;}
+        .breadcrumb a:hover{color:#0056b3;}
+    </style>
+</head>
+<body><div class="breadcrumb"><a href="../index.html">Inicio</a> / <span>tecnologias</span></div><h1>Apache Kafka</h1>
+<p><img alt="raw" src="../../images/kafka/kafka.png" /></p>
+<p>Apache Kafka es una plataforma distribuida de mensajería orientada a eventos. Permite publicar, suscribirse, almacenar y procesar flujos de registros en tiempo real.</p>
+<h2>Características principales</h2>
+<ul>
+<li><strong>Alta escalabilidad</strong>: Soporta grandes volúmenes de datos y múltiples consumidores/produtores.</li>
+<li><strong>Tolerancia a fallos</strong>: Réplica de datos entre brokers para garantizar disponibilidad.</li>
+<li><strong>Persistencia de mensajes</strong>: Almacena registros en disco con configuraciones de retención personalizables.</li>
+<li><strong>Integración con microservicios</strong>: Compatible con arquitecturas modernas y flujos de datos en tiempo real.</li>
+</ul>
+<h2>Casos de uso</h2>
+<ul>
+<li>Procesamiento de pagos en tiempo real.</li>
+<li>Monitorización de sistemas y aplicaciones en tiempo real.</li>
+<li>Pipelines de datos para ETL (Extracción, Transformación y Carga).</li>
+<li>Transmisión de eventos para aplicaciones de streaming.</li>
+</ul>
+<h2>Zookeeper</h2>
+<p><strong>Zookeeper</strong> es un servicio de coordinación distribuida que maneja:</p>
+<ul>
+<li><strong>Gestión de metadatos</strong>: Almacena información sobre brokers, tópicos y particiones.</li>
+<li><strong>Liderazgo y sincronización</strong>: Coordina la elección de líderes entre brokers y mantiene la consistencia.</li>
+<li><strong>Configuración dinámica</strong>: Permite ajustes en tiempo real del clúster.</li>
+</ul>
+<p>En la configuración clásica, Zookeeper se despliega como un contenedor separado para soportar un clúster Kafka de uno o varios nodos <a href="../pliegos-tecnicos/kafka-config_zookeeper.html">documento técnico</a>.</p>
+<h2>KRaft</h2>
+<p><strong>KRaft</strong> (Kafka Raft Metadata mode).</p>
+<ul>
+<li><strong>Gestión interna de metadatos</strong>: El propio broker Kafka almacena y replica los metadatos usando el protocolo Raft.</li>
+<li><strong>Arranque más rápido y menos puntos de fallo</strong>.</li>
+</ul>
+<p>En el <a href="../pliegos-tecnicos/kafka-config_kraft.html">documento técnico de KRaft</a> tienes la guía completa para este modo.</p>
+<h2>Pliegos Técnicos</h2>
+<p>A continuación tienes dos guías detalladas para desplegar y administrar Kafka en contenedores Docker, según el modo de operación:</p>
+<ul>
+<li>
+<p><a href="../pliegos-tecnicos/kafka-config_zookeeper.html">Configuración clásica con Zookeeper (Legacy)</a>:
+  Explica el despliegue tradicional de Kafka que requiere Zookeeper para la gestión de metadatos y coordinación del clúster. Útil para entornos legacy o si necesitas compatibilidad con versiones antiguas.</p>
+</li>
+<li>
+<p><a href="../pliegos-tecnicos/kafka-config_kraft.html">Configuración moderna con KRaft (sin Zookeeper)</a>:
+  Guía para desplegar Kafka en modo KRaft, usando las últimas versiones y mejores prácticas recomendadas por la comunidad. Recomendado para nuevos proyectos o migraciones.</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>¿Cuál usar?</strong></p>
+</blockquote>
+<ul>
+<li>Usa la guía <strong>KRaft</strong> para nuevos despliegues, pruebas, desarrollo y producción moderna.</li>
+<li>Usa la guía <strong>Zookeeper</strong> solo si tienes dependencias legacy o necesitas compatibilidad con herramientas que aún no soportan KRaft.</li>
+</ul>
+<h2>Enlaces útiles</h2>
+<ul>
+<li><a href="https://kafka.apache.org/">Sitio oficial de Apache Kafka</a></li>
+<li><a href="https://kafka.apache.org/documentation/">Documentación técnica de Kafka</a></li>
+<li><a href="https://zookeeper.apache.org/doc/current/">Documentación de Zookeeper</a></li>
+</ul>
+<h2><a href="../../index.html">⬅ Volver al Readme</a></h2></body></html>

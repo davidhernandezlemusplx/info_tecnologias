@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>mysql-config</title>
+    <style>
+        body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px;}
+        pre{background:#f5f5f5;padding:1em;overflow-x:auto;}
+        code{font-family:Consolas,monospace;}
+        h1,h2,h3{color:#2c3e50;}
+        table{border-collapse:collapse;width:100%;margin:1em 0;}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+        th{background-color:#f2f2f2;}
+        tr:nth-child(even){background-color:#f9f9f9;}
+        a{color:#3498db;text-decoration:none;}
+        a:hover{text-decoration:underline;}
+        .breadcrumb{background:#f8f9fa;padding:8px 15px;border-radius:4px;margin-bottom:20px;}
+        .breadcrumb a{color:#6c757d;}
+        .breadcrumb a:hover{color:#0056b3;}
+    </style>
+</head>
+<body><div class="breadcrumb"><a href="../index.html">Inicio</a> / <a href=../index.html>pliegos-tecnicos</a> / <span>bbdd</span></div><h1>Configuración de MySQL</h1>
+<p><img alt="raw" src="../../../images/bbdd/mysql/mysql.png" /></p>
+<p>Guía detallada para configurar y administrar MySQL en contenedores Docker.</p>
+<h2>Tabla de Contenidos</h2>
+<ul>
+<li><a href="#configuración-de-mysql">Configuración de MySQL</a></li>
+<li><a href="#tabla-de-contenidos">Tabla de Contenidos</a></li>
+<li><a href="#prerequisitos">Prerequisitos</a></li>
+<li><a href="#paso-1-configuración-con-docker-compose">Paso 1: Configuración con Docker Compose</a></li>
+<li><a href="#paso-2-iniciar-el-contenedor-mysql">Paso 2: Iniciar el contenedor MySQL</a><ul>
+<li><a href="#gestión-rápida-con-makefile">Gestión rápida con Makefile</a></li>
+</ul>
+</li>
+<li><a href="#paso-3-conexión-y-operaciones-básicas">Paso 3: Conexión y operaciones básicas</a><ul>
+<li><a href="#conectarse-al-servidor-mysql">Conectarse al servidor MySQL</a></li>
+<li><a href="#comandos-básicos-de-mysql">Comandos básicos de MySQL</a></li>
+</ul>
+</li>
+<li><a href="#paso-4-gestión-de-bases-de-datos">Paso 4: Gestión de bases de datos</a><ul>
+<li><a href="#crear-una-base-de-datos">Crear una base de datos</a></li>
+<li><a href="#eliminar-una-base-de-datos">Eliminar una base de datos</a></li>
+</ul>
+</li>
+<li><a href="#paso-5-gestión-de-usuarios-y-permisos">Paso 5: Gestión de usuarios y permisos</a><ul>
+<li><a href="#crear-un-nuevo-usuario">Crear un nuevo usuario</a></li>
+<li><a href="#otorgar-permisos">Otorgar permisos</a></li>
+</ul>
+</li>
+<li><a href="#paso-6-importar-y-exportar-datos">Paso 6: Importar y exportar datos</a><ul>
+<li><a href="#importar-un-archivo-sql">Importar un archivo SQL</a></li>
+<li><a href="#exportar-una-base-de-datos">Exportar una base de datos</a></li>
+<li><a href="#conectar-con-cliente-mysql-externo">Conectar con cliente MySQL externo</a></li>
+</ul>
+</li>
+<li><a href="#resolución-de-problemas">Resolución de problemas</a><ul>
+<li><a href="#ver-logs-del-contenedor">Ver logs del contenedor</a></li>
+<li><a href="#conectar-directamente-al-contenedor">Conectar directamente al contenedor</a></li>
+<li><a href="#ver-variables-de-configuración">Ver variables de configuración</a></li>
+</ul>
+</li>
+<li><a href="#enlaces-útiles">Enlaces útiles</a></li>
+<li><a href="#recomendaciones-adicionales">Recomendaciones adicionales</a></li>
+<li><a href="#volver-a-su-ficha">Volver a su ficha</a></li>
+</ul>
+<h2>Prerequisitos</h2>
+<p>Antes de comenzar, asegúrate de lo siguiente:</p>
+<ul>
+<li><strong>Docker</strong> está instalado y en ejecución.</li>
+<li><strong>Docker Compose</strong> está instalado (se recomienda la versión 2.29.x o superior).</li>
+<li><strong>Make</strong> (opcional, pero recomendado para simplificar los comandos).</li>
+</ul>
+<blockquote>
+<p>Puedes utilizar el script de <code>docker_install.sh</code> de la carpeta <code>/resources</code> para instalar ambas cosas en WSL/Ubuntu.</p>
+</blockquote>
+<h2>Paso 1: Configuración con Docker Compose</h2>
+<p>Crea un archivo <code>docker-compose.yml</code> con la siguiente configuración. Puedes encontrar los archivos de configuración en el directorio <code>/resources/bbdd/mysql/</code>:</p>
+<p>docker-compose.yml</p>
+<pre><code class="language-yaml">services:
+  mysql:
+    image: mysql:8.4.5
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: mydatabase
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - &quot;3306:3306&quot;
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    healthcheck:
+      test: [&quot;CMD&quot;, &quot;mysqladmin&quot;, &quot;ping&quot;, &quot;-h&quot;, &quot;localhost&quot;]
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql_data:
+</code></pre>
+<h2>Paso 2: Iniciar el contenedor MySQL</h2>
+<p>Inicia los contenedores de MinIO y el cliente usando Docker Compose. Este comando descarga las imágenes (si no están descargadas), crea los volúmenes y arranca los servicios.</p>
+<pre><code class="language-bash">docker-compose up -d
+</code></pre>
+<ul>
+<li><strong>Explicación</strong>:</li>
+<li>El flag <code>-d</code> ejecuta los contenedores en segundo plano (modo detach).</li>
+<li>
+<p>Verifica que los contenedores estén en ejecución:</p>
+<p><code>bash
+docker ps</code></p>
+<p>Deberías ver un contenedor: <code>mysql</code> con el puerto <code>3306</code> mapeado.</p>
+</li>
+</ul>
+<h3>Gestión rápida con Makefile</h3>
+<p>En la carpeta <code>resources/bbdd/mysql/</code> tienes un <code>Makefile</code> preparado para gestionar MySQL fácilmente:</p>
+<pre><code class="language-makefile">MYSQL_COMPOSE=docker-compose.yml
+
+up:
+    docker-compose -f $(MYSQL_COMPOSE) up -d
+
+down:
+    docker-compose -f $(MYSQL_COMPOSE) down
+
+logs:
+    docker-compose -f $(MYSQL_COMPOSE) logs -f
+
+restart: 
+    docker-compose -f $(MYSQL_COMPOSE) restart
+</code></pre>
+<p>Ejecuta los siguientes comandos desde esa carpeta:</p>
+<ul>
+<li>Levantar MySQL:</li>
+</ul>
+<p><code>bash
+  make up</code></p>
+<ul>
+<li>Parar MySQL:</li>
+</ul>
+<p><code>bash
+  make down</code></p>
+<ul>
+<li>Reiniciar MySQL:</li>
+</ul>
+<p><code>bash
+  make restart</code></p>
+<ul>
+<li>Ver logs:</li>
+</ul>
+<p><code>bash
+  make logs</code></p>
+<blockquote>
+<p><strong>Nota:</strong> Para usar los comandos <code>make</code>, asegúrate de tener instalado el paquete <code>make</code>.
+Puedes instalarlo en sistemas basados en Debian/Ubuntu con:</p>
+</blockquote>
+<pre><code class="language-bash">sudo apt install make
+</code></pre>
+<h2>Paso 3: Conexión y operaciones básicas</h2>
+<h3>Conectarse al servidor MySQL</h3>
+<pre><code class="language-bash">docker exec -it mysql mysql -u root -p
+</code></pre>
+<h3>Comandos básicos de MySQL</h3>
+<ul>
+<li>Mostrar bases de datos:</li>
+</ul>
+<p><code>sql
+  SHOW DATABASES;</code></p>
+<ul>
+<li>Usar una base de datos:</li>
+</ul>
+<p><code>sql
+  USE nombre_base_datos;</code></p>
+<ul>
+<li>Mostrar tablas:</li>
+</ul>
+<p><code>sql
+  SHOW TABLES;</code></p>
+<h2>Paso 4: Gestión de bases de datos</h2>
+<h3>Crear una base de datos</h3>
+<pre><code class="language-sql">CREATE DATABASE nombre_base_datos;
+</code></pre>
+<h3>Eliminar una base de datos</h3>
+<pre><code class="language-sql">DROP DATABASE nombre_base_datos;
+</code></pre>
+<h2>Paso 5: Gestión de usuarios y permisos</h2>
+<h3>Crear un nuevo usuario</h3>
+<pre><code class="language-sql">CREATE USER 'usuario'@'%' IDENTIFIED BY 'contraseña_segura';
+</code></pre>
+<h3>Otorgar permisos</h3>
+<pre><code class="language-sql">GRANT ALL PRIVILEGES ON nombre_base_datos.* TO 'usuario'@'%';
+FLUSH PRIVILEGES;
+</code></pre>
+<h2>Paso 6: Importar y exportar datos</h2>
+<h3>Importar un archivo SQL</h3>
+<ol>
+<li>Copia el archivo al contenedor:</li>
+</ol>
+<p><code>bash
+   docker cp archivo.sql mysql:/tmp/</code></p>
+<ol>
+<li>Importa la base de datos:</li>
+</ol>
+<p><code>bash
+   docker exec -i mysql mysql -u root -p nombre_base_datos &lt; archivo.sql</code></p>
+<h3>Exportar una base de datos</h3>
+<pre><code class="language-bash">docker exec mysql mysqldump -u root -p nombre_base_datos &gt; backup.sql
+</code></pre>
+<h3>Conectar con cliente MySQL externo</h3>
+<p>Puedes conectar cualquier cliente MySQL a:</p>
+<ul>
+<li>Host: <code>localhost</code></li>
+<li>Puerto: <code>3306</code></li>
+<li>Usuario: <code>root</code> o el usuario que hayas configurado</li>
+<li>Contraseña: La que hayas establecido en las variables de entorno</li>
+</ul>
+<h2>Resolución de problemas</h2>
+<h3>Ver logs del contenedor</h3>
+<pre><code class="language-bash">docker logs mysql
+</code></pre>
+<h3>Conectar directamente al contenedor</h3>
+<pre><code class="language-bash">docker exec -it mysql bash
+</code></pre>
+<h3>Ver variables de configuración</h3>
+<pre><code class="language-bash">docker exec -it mysql mysql -u root -p -e &quot;SHOW VARIABLES;&quot;
+</code></pre>
+<h2>Enlaces útiles</h2>
+<ul>
+<li><a href="https://dev.mysql.com/doc/">Documentación oficial de MySQL</a></li>
+<li><a href="https://hub.docker.com/_/mysql">MySQL en Docker Hub</a></li>
+<li><a href="https://docs.docker.com/compose/compose-file/">Guía de referencia de Docker Compose</a></li>
+</ul>
+<h2>Recomendaciones adicionales</h2>
+<ul>
+<li>Habilita SSL/TLS para conexiones seguras en producción.</li>
+<li>Configura índices para optimizar las consultas frecuentes.</li>
+<li>Usa <code>my.cnf</code> para ajustar parámetros como <code>innodb_buffer_pool_size</code> y mejorar el rendimiento.</li>
+<li>Integra con Kafka Connect usando conectores como <code>io.debezium.connector.mysql.MySqlConnector</code> para streaming de datos.</li>
+<li>Monitorea el rendimiento con herramientas como <code>MySQL Workbench</code> o <code>SHOW PROFILE</code>.</li>
+</ul>
+<h2>Volver a su ficha</h2>
+<p><a href="../../tecnologias/bbdd/mysql.html">Volver a la ficha de MySQL</a></p></body></html>

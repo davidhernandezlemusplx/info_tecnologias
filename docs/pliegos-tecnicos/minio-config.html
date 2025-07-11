@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>minio-config</title>
+    <style>
+        body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px;}
+        pre{background:#f5f5f5;padding:1em;overflow-x:auto;}
+        code{font-family:Consolas,monospace;}
+        h1,h2,h3{color:#2c3e50;}
+        table{border-collapse:collapse;width:100%;margin:1em 0;}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+        th{background-color:#f2f2f2;}
+        tr:nth-child(even){background-color:#f9f9f9;}
+        a{color:#3498db;text-decoration:none;}
+        a:hover{text-decoration:underline;}
+        .breadcrumb{background:#f8f9fa;padding:8px 15px;border-radius:4px;margin-bottom:20px;}
+        .breadcrumb a{color:#6c757d;}
+        .breadcrumb a:hover{color:#0056b3;}
+    </style>
+</head>
+<body><div class="breadcrumb"><a href="../index.html">Inicio</a> / <span>pliegos-tecnicos</span></div><h1>Configuración de MinIO</h1>
+<p><img alt="raw" src="../../images/minio/minio.png" /></p>
+<p>Este documento describe cómo instalar y configurar MinIO con contenedores.</p>
+<h2>Tabla de Contenidos</h2>
+<ul>
+<li><a href="#configuración-de-minio">Configuración de MinIO</a></li>
+<li><a href="#tabla-de-contenidos">Tabla de Contenidos</a></li>
+<li><a href="#prerequisitos">Prerequisitos</a></li>
+<li><a href="#paso-1-crear-un-archivo-docker-compose">Paso 1: Crear un archivo Docker Compose</a></li>
+<li><a href="#paso-2-desplegar-minio-con-docker-compose">Paso 2: Desplegar MinIO con Docker Compose</a><ul>
+<li><a href="#gestión-rápida-con-makefile">Gestión rápida con Makefile</a></li>
+</ul>
+</li>
+<li><a href="#paso-3-verificar-el-despliegue">Paso 3: Verificar el despliegue</a></li>
+<li><a href="#paso-4-usar-el-cliente-minio-mc-para-gestionar-buckets">Paso 4: Usar el Cliente MinIO (mc) para Gestionar Buckets</a></li>
+<li><a href="#paso-5-gestión-del-contenedor-de-minio">Paso 5: Gestión del contenedor de MinIO</a></li>
+<li><a href="#consejos-para-compatibilidad-multiplataforma">Consejos para compatibilidad multiplataforma</a></li>
+<li><a href="#resolución-de-problemas">Resolución de problemas</a></li>
+<li><a href="#volver-a-su-ficha">Volver a su ficha</a></li>
+</ul>
+<h2>Prerequisitos</h2>
+<p>Antes de comenzar, asegúrate de lo siguiente:</p>
+<ul>
+<li><strong>Docker</strong> está instalado y en ejecución.</li>
+<li><strong>Docker Compose</strong> está instalado (se recomienda la versión 2.29.x o superior). Verifica con:</li>
+</ul>
+<blockquote>
+<p>Puedes utilizar el script de <code>docker_install.sh</code> de la carpeta <code>/resources</code> para instalar ambas cosas en WSL/Ubuntu.</p>
+</blockquote>
+<ul>
+<li>Tienes suficiente espacio en disco para el almacenamiento de datos de MinIO (al menos 1GB para pruebas).</li>
+<li>Los puertos <code>9000</code> (API) y <code>9001</code> (consola) están disponibles en tu máquina anfitriona.</li>
+</ul>
+<h2>Paso 1: Crear un archivo Docker Compose</h2>
+<p>Crea un archivo <code>docker-compose.yml</code> para definir el servicio de MinIO, incluyendo puertos, variables de entorno, volúmenes y el comando para ejecutar el servidor. Tambien puedes usar el fichero pregenerado de la carpeta <code>resources/minio/</code> Este enfoque asegura consistencia entre plataformas.</p>
+<p>minio-compose.yml</p>
+<pre><code class="language-yml">services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - &quot;9000:9000&quot;
+      - &quot;9001:9001&quot;
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=admin123
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address &quot;:9001&quot;
+    healthcheck:
+      test: [&quot;CMD&quot;, &quot;curl&quot;, &quot;-f&quot;, &quot;http://localhost:9000/minio/health/live&quot;]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  minio-client:
+    image: minio/mc:latest
+    container_name: minio_client
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: [&quot;/bin/sh&quot;, &quot;-c&quot;]
+    command: &gt;
+      &quot;mc alias set myminio http://minio:9000 admin admin123;
+       tail -f /dev/null&quot;
+    volumes:
+      - minio_client_data:/root/.mc
+
+volumes:
+  minio_data:
+  minio_client_data:
+</code></pre>
+<ul>
+<li><strong>Explicación</strong>:</li>
+<li><strong>Imagen</strong>: Usa <code>minio/minio:latest</code> para la versión más reciente de MinIO y <code>minio/mc:latest</code> para el cliente MinIO.</li>
+<li><strong>Nombre del contenedor</strong>: Asigna nombres fijos <code>minio</code> y <code>minio_client</code> para referencia sencilla.</li>
+<li><strong>Puertos</strong>: Mapea los puertos <code>9000</code> (API) y <code>9001</code> (consola) del host a los del contenedor MinIO.</li>
+<li><strong>Variables de entorno</strong>: Establece credenciales por defecto (<code>admin</code>/<code>admin123</code>). <strong>Cámbialas en producción</strong> por seguridad.</li>
+<li><strong>Volúmenes</strong>: Persiste los datos en volúmenes Docker llamados <code>minio_data</code> y <code>minio_client_data</code> para evitar pérdida de datos.</li>
+<li><strong>Comando</strong>: Ejecuta el servidor MinIO con <code>/data</code> como directorio de almacenamiento y la consola en el puerto <code>9001</code>. El cliente configura un alias <code>myminio</code> y permanece activo.</li>
+<li><strong>Healthcheck</strong>: Comprueba periódicamente si MinIO está en funcionamiento consultando su endpoint de salud.</li>
+<li><strong>Dependencia</strong>: El cliente espera a que el servidor MinIO esté saludable antes de iniciarse.</li>
+</ul>
+<h2>Paso 2: Desplegar MinIO con Docker Compose</h2>
+<p>Inicia los contenedores de MinIO y el cliente usando Docker Compose. Este comando descarga las imágenes (si no están descargadas), crea los volúmenes y arranca los servicios.</p>
+<pre><code class="language-bash">docker-compose up -d
+</code></pre>
+<ul>
+<li><strong>Explicación</strong>:</li>
+<li>El flag <code>-d</code> ejecuta los contenedores en segundo plano (modo detach).</li>
+<li>
+<p>Verifica que los contenedores estén en ejecución:</p>
+<p><code>bash
+docker ps</code></p>
+<p>Deberías ver dos contenedores: <code>minio</code> con los puertos <code>9000</code> y <code>9001</code> mapeados, y <code>minio_client</code>.</p>
+</li>
+</ul>
+<h3>Gestión rápida con Makefile</h3>
+<p>En la carpeta <code>resources/minio/</code> tienes un <code>Makefile</code> preparado para gestionar MinIO fácilmente:</p>
+<pre><code class="language-makefile">MINIO_COMPOSE=docker-compose.yml
+
+up:
+    docker compose -f $(MINIO_COMPOSE) up -d
+
+down:
+    docker compose -f $(MINIO_COMPOSE) down
+
+restart:
+    docker compose -f $(MINIO_COMPOSE) restart
+
+logs:
+    docker compose -f $(MINIO_COMPOSE) logs -f
+</code></pre>
+<p>Ejecuta los siguientes comandos desde esa carpeta:</p>
+<ul>
+<li>Levantar MinIO:</li>
+</ul>
+<p><code>bash
+  make up</code></p>
+<ul>
+<li>Parar MinIO:</li>
+</ul>
+<p><code>bash
+  make down</code></p>
+<ul>
+<li>Reiniciar MinIO:</li>
+</ul>
+<p><code>bash
+  make restart</code></p>
+<ul>
+<li>Ver logs:</li>
+</ul>
+<p><code>bash
+  make logs</code></p>
+<blockquote>
+<p><strong>Nota:</strong> Para usar los comandos <code>make</code>, asegúrate de tener instalado el paquete <code>make</code>.
+Puedes instalarlo en sistemas basados en Debian/Ubuntu con:</p>
+</blockquote>
+<pre><code class="language-bash">sudo apt install make
+</code></pre>
+<h2>Paso 3: Verificar el despliegue</h2>
+<ol>
+<li><strong>Comprobar el estado de MinIO</strong>:
+   Asegúrate de que el servicio MinIO está en ejecución:</li>
+</ol>
+<p><code>bash
+   docker logs minio</code></p>
+<p>Busca un mensaje como:</p>
+<p><code>txt
+   API: http://172.18.0.2:9000  http://127.0.0.1:9000
+   WebUI: http://172.18.0.2:9001 http://127.0.0.1:9001</code></p>
+<ol>
+<li><strong>Acceder a la consola de MinIO</strong>:
+   Abre un navegador y navega a:</li>
+</ol>
+<p><code>txt
+   http://localhost:9001</code></p>
+<p><img alt="minio" src="../../images/minio/loginui.png" /></p>
+<p>Inicia sesión con las credenciales:
+   - <strong>Usuario</strong>: <code>admin</code>
+   - <strong>Contraseña</strong>: <code>admin123</code>
+   Deberías ver la interfaz web de MinIO para gestionar buckets y objetos.</p>
+<ol>
+<li><strong>Probar la API</strong>:
+   Usa <code>curl</code> para verificar el endpoint de la API:</li>
+</ol>
+<p><code>bash
+   curl http://localhost:9000/minio/health/live</code></p>
+<p>Si MinIO está en ejecución, esto no debería devolver errores.</p>
+<h2>Paso 4: Usar el Cliente MinIO (mc) para Gestionar Buckets</h2>
+<p>El contenedor <code>minio_client</code> permite interactuar con el servidor MinIO desde la línea de comandos usando el cliente <code>mc</code>. Puedes crear y gestionar buckets, subir archivos y más.</p>
+<ol>
+<li><strong>Acceder al contenedor del cliente</strong>:
+   Abre una shell interactiva en el contenedor <code>minio_client</code>:</li>
+</ol>
+<p><code>bash
+   docker exec -it minio_client /bin/sh</code></p>
+<ol>
+<li><strong>Listar buckets existentes</strong>:
+   Dentro del contenedor, ejecuta:</li>
+</ol>
+<p><code>bash
+   mc ls myminio</code></p>
+<ul>
+<li>
+<p><strong>Explicación</strong>: Este comando lista todos los buckets en el servidor MinIO bajo el alias <code>myminio</code> (configurado en el <code>docker-compose.yml</code> para conectar a <code>http://minio:9000</code>). Si no hay buckets, la salida estará vacía.</p>
+</li>
+<li>
+<p><strong>Crear un nuevo bucket</strong>:
+   Crea un bucket llamado <code>my-bucket</code>:</p>
+</li>
+</ul>
+<p><code>bash
+   mc mb myminio/my-bucket</code></p>
+<ul>
+<li>
+<p><strong>Explicación</strong>: El comando <code>mc mb</code> crea un nuevo bucket en el servidor MinIO. Un bucket es un contenedor lógico para almacenar objetos (archivos) en MinIO, similar a una carpeta de nivel superior. La salida debería ser:</p>
+<p><code>txt
+ Bucket created successfully `myminio/my-bucket`.</code></p>
+</li>
+<li>
+<p><strong>Verificar la creación del bucket</strong>:
+   Vuelve a listar los buckets para confirmar:</p>
+</li>
+</ul>
+<p><code>bash
+   mc ls myminio</code></p>
+<p>Deberías ver algo como:</p>
+<p><code>txt
+   [2025-07-04 09:00:00 CEST]     0B my-bucket/</code></p>
+<p>También puedes verificar en la consola web de MinIO (<code>http://localhost:9001</code>) navegando a la sección de buckets, donde <code>my-bucket</code> debería aparecer.</p>
+<ol>
+<li><strong>Subir un archivo de prueba (opcional)</strong>:
+   Para confirmar que el bucket funciona, crea un archivo de prueba y súbelo:</li>
+</ol>
+<p><code>bash
+   echo "¡Hola, MinIO!" &gt; prueba.txt
+   mc cp prueba.txt myminio/my-bucket/</code></p>
+<p>Luego, verifica los objetos en el bucket:</p>
+<p><code>bash
+   mc ls myminio/my-bucket</code></p>
+<p>Espera una salida como:</p>
+<p><code>txt
+   [2025-07-04 09:05:00 CEST]    28B prueba.txt</code></p>
+<p><img alt="minio" src="../../images/minio/loginui_prueba.png" /></p>
+<ul>
+<li><strong>Propósito</strong>:</li>
+<li>Los buckets son esenciales para organizar y almacenar datos en MinIO. Crear un bucket como <code>my-bucket</code> te permite empezar a guardar objetos (archivos) que pueden ser accedidos a través de la API de MinIO o la consola web.</li>
+<li>El cliente <code>mc</code> facilita la gestión del almacenamiento desde la línea de comandos, ideal para automatización o tareas rápidas.</li>
+</ul>
+<h2>Paso 5: Gestión del contenedor de MinIO</h2>
+<ul>
+<li><strong>Detener los contenedores</strong>:</li>
+</ul>
+<p><code>bash
+  docker-compose down</code></p>
+<p>Esto detiene y elimina los contenedores pero conserva los volúmenes <code>minio_data</code> y <code>minio_client_data</code>.</p>
+<ul>
+<li><strong>Reiniciar los contenedores</strong>:</li>
+</ul>
+<p><code>bash
+  docker-compose up -d</code></p>
+<ul>
+<li><strong>Eliminar los volúmenes (si es necesario)</strong>:
+  Para borrar todos los datos de MinIO:</li>
+</ul>
+<p><code>bash
+  docker volume rm minio_minio_data minio_minio_client_data</code></p>
+<h2>Consejos para compatibilidad multiplataforma</h2>
+<ul>
+<li><strong>Volúmenes de Docker</strong>: Los volúmenes <code>minio_data</code> y <code>minio_client_data</code> aseguran la persistencia de datos entre reinicios de contenedores y son compatibles con todas las plataformas soportadas por Docker.</li>
+<li><strong>Notas para WSL</strong>: Si usas WSL, asegúrate de que Docker Desktop esté configurado para integrarse con WSL2, o usa la instalación de Docker del script anterior. Accede a la consola vía <code>http://localhost:9001</code> desde el host de Windows, no desde la IP interna de WSL.</li>
+</ul>
+<h2>Resolución de problemas</h2>
+<ul>
+<li><strong>El contenedor no inicia</strong>:
+  Revisa los logs:</li>
+</ul>
+<p><code>bash
+  docker logs minio</code></p>
+<p>Problemas comunes: conflictos de puertos, credenciales incorrectas o permisos insuficientes.</p>
+<ul>
+<li>
+<p><strong>No se puede acceder a la consola</strong>:
+  Asegúrate de acceder a <code>http://localhost:9001</code> desde la máquina anfitriona. Si usas WSL, verifica la integración de Docker Desktop con WSL o usa <code>http://127.0.0.1:9001</code>.</p>
+</li>
+<li>
+<p><strong>Los datos no persisten</strong>:
+  Verifica que los volúmenes <code>minio_data</code> y <code>minio_client_data</code> existan:</p>
+</li>
+</ul>
+<p><code>bash
+  docker volume ls | grep minio</code></p>
+<h2>Volver a su ficha</h2>
+<p><a href="../tecnologias/minio.html">Volver a la ficha de MinIO</a></p></body></html>

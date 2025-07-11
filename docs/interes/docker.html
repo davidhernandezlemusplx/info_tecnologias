@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>docker</title>
+    <style>
+        body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:20px;}
+        pre{background:#f5f5f5;padding:1em;overflow-x:auto;}
+        code{font-family:Consolas,monospace;}
+        h1,h2,h3{color:#2c3e50;}
+        table{border-collapse:collapse;width:100%;margin:1em 0;}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+        th{background-color:#f2f2f2;}
+        tr:nth-child(even){background-color:#f9f9f9;}
+        a{color:#3498db;text-decoration:none;}
+        a:hover{text-decoration:underline;}
+        .breadcrumb{background:#f8f9fa;padding:8px 15px;border-radius:4px;margin-bottom:20px;}
+        .breadcrumb a{color:#6c757d;}
+        .breadcrumb a:hover{color:#0056b3;}
+    </style>
+</head>
+<body><div class="breadcrumb"><a href="../index.html">Inicio</a> / <span>interes</span></div><h1>Docker + Docker Compose</h1>
+<p><img alt="raw" src="../../images/interes/docker.png" /></p>
+<h2>Tabla de Contenidos</h2>
+<ul>
+<li><a href="#docker--docker-compose">Docker + Docker Compose</a></li>
+<li><a href="#tabla-de-contenidos">Tabla de Contenidos</a></li>
+<li><a href="#1-instalación-de-docker-y-docker-compose">1. Instalación de Docker y Docker Compose</a></li>
+<li><a href="#2-probar-instalación-con-docker-pull">2. Probar instalación con <code>docker pull</code></a></li>
+<li><a href="#3-ver-contenedores-e-imágenes">3. Ver contenedores e imágenes</a></li>
+<li><a href="#4-eliminar-contenedores-e-imágenes">4. Eliminar contenedores e imágenes</a></li>
+<li><a href="#5-crear-un-dockerfile-ejemplo-nodejs">5. Crear un Dockerfile (ejemplo Node.js)</a></li>
+<li><a href="#6-crear-un-docker-composeyml">6. Crear un docker-compose.yml</a></li>
+<li><a href="#7-levantar--eliminar-docker">7. Levantar / Eliminar Docker</a><ul>
+<li><a href="#iniciar-contenedores">Iniciar contenedores</a></li>
+<li><a href="#detener-contenedores">Detener contenedores</a></li>
+</ul>
+</li>
+<li><a href="#8-script-automático-de-instalación-de-docker--docker-compose">8. Script automático de instalación de Docker + Docker Compose</a><ul>
+<li><a href="#qué-hace-el-script">¿Qué hace el script?</a></li>
+<li><a href="#cómo-usarlo">Cómo usarlo</a></li>
+<li><a href="#notas">Notas</a></li>
+</ul>
+</li>
+<li><a href="#volver-al-readme">Volver al README</a></li>
+</ul>
+<h2>1. Instalación de Docker y Docker Compose</h2>
+<pre><code class="language-bash">sudo apt update &amp;&amp; sudo apt install -y ca-certificates curl gnupg lsb-release
+</code></pre>
+<p>Añade la clave GPG oficial de Docker:</p>
+<pre><code class="language-bash">sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+</code></pre>
+<p>Configura el repositorio oficial:</p>
+<pre><code class="language-bash">echo \
+  &quot;deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable&quot; | \
+  sudo tee /etc/apt/sources.list.d/docker.list &gt; /dev/null
+</code></pre>
+<p>Instala Docker y Docker Compose:</p>
+<pre><code class="language-bash">sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+</code></pre>
+<p>Añade tu usuario al grupo docker:</p>
+<pre><code class="language-bash">sudo usermod -aG docker $USER
+</code></pre>
+<p>Reinicia sesión o WSL, luego verifica:</p>
+<pre><code class="language-bash">docker version
+docker compose version
+</code></pre>
+<h2>2. Probar instalación con <code>docker pull</code></h2>
+<pre><code class="language-bash">docker pull alpine
+docker images
+</code></pre>
+<h2>3. Ver contenedores e imágenes</h2>
+<pre><code class="language-bash">docker ps       # Contenedores activos
+docker ps -a    # Todos los contenedores
+docker images   # Imágenes descargadas
+</code></pre>
+<h2>4. Eliminar contenedores e imágenes</h2>
+<pre><code class="language-bash">docker rm &lt;id|nombre&gt;         # Eliminar contenedor detenido
+docker rmi &lt;id|nombre&gt;        # Eliminar imagen
+docker container prune        # Eliminar contenedores detenidos
+docker image prune -a         # Eliminar todas las imágenes no usadas
+</code></pre>
+<h2>5. Crear un Dockerfile (ejemplo Node.js)</h2>
+<pre><code class="language-Dockerfile">FROM node:18
+WORKDIR /app
+COPY . .
+RUN npm install
+CMD [&quot;npm&quot;, &quot;start&quot;]
+</code></pre>
+<h2>6. Crear un docker-compose.yml</h2>
+<pre><code class="language-yaml">services:
+  app:
+    build: .
+    ports:
+      - &quot;3000:3000&quot;
+    depends_on:
+      - postgres
+    environment:
+      - DB_HOST=postgres
+      - DB_USER=postgres
+      - DB_PASS=example
+      - DB_NAME=miapp
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: miapp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: example
+    ports:
+      - &quot;5432:5432&quot;
+</code></pre>
+<h2>7. Levantar / Eliminar Docker</h2>
+<h3>Iniciar contenedores</h3>
+<pre><code class="language-bash">docker compose up -d
+</code></pre>
+<h3>Detener contenedores</h3>
+<pre><code class="language-bash">docker compose down
+</code></pre>
+<h2>8. Script automático de instalación de Docker + Docker Compose</h2>
+<p>Si prefieres automatizar toda la instalación de Docker y Docker Compose en WSL (Ubuntu), puedes usar el script <code>docker_install.sh</code>, de la carpeta <code>/resources</code>.</p>
+<h3>¿Qué hace el script?</h3>
+<ul>
+<li>Instalar Docker en WSL (Ubuntu)</li>
+<li>Actualiza los paquetes de Ubuntu</li>
+<li>Instala los paquetes necesarios para la instalación de Docker</li>
+<li>Agrega la clave GPG de Docker</li>
+<li>Agrega el repositorio de Docker</li>
+<li>Actualiza los paquetes nuevamente para incluir el repositorio de Docker</li>
+<li>Instala Docker CE (Community Edition)</li>
+<li>Inicia el servicio de Docker</li>
+<li>Instalar Docker Compose en WSL</li>
+<li>Descarga Docker Compose</li>
+</ul>
+<h3>Cómo usarlo</h3>
+<p>Dale permisos de ejecución:</p>
+<pre><code class="language-bash">chmod +x install_docker.sh
+</code></pre>
+<p>Ejecuta el script:</p>
+<pre><code class="language-bash">./install_docker.sh
+</code></pre>
+<h3>Notas</h3>
+<p>Este script está pensado para distribuciones Ubuntu dentro de WSL.</p>
+<blockquote>
+<p>El comando newgrp docker recarga los grupos del usuario actual sin cerrar sesión, pero a veces es necesario cerrar WSL y volver a entrar para que docker funcione sin sudo.</p>
+</blockquote>
+<h2><a href="../../index.html">⬅ Volver al Readme</a></h2></body></html>
